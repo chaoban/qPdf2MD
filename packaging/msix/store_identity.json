@@ -1,0 +1,6 @@
+{
+  "說明": "把 Partner Center > 你的 App > 產品管理 > 產品身分識別 (Product identity) 的三個值原樣貼上。打包前必須填好，build_msix.bat 會檢查。",
+  "Name": "SAISAI.Dev.qPdf2MD",
+  "Publisher": "CN=8EE2A838-6C91-4290-8711-F41153FB93C1",
+  "PublisherDisplayName": "SAISAI.Dev"
+}

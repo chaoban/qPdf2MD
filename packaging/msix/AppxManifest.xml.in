@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- qPdf2MD MSIX manifest template. packaging/make_msix.py fills in the brace placeholders below:
+     identity values come from packaging/msix/store_identity.json (Partner Center > Product identity),
+     the version from APP_VERSION in qpdf2mk/__init__.py. -->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity Name="{name}" Publisher="{publisher}" Version="{version}" ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>{display_name}</DisplayName>
+    <PublisherDisplayName>{publisher_display_name}</PublisherDisplayName>
+    <Description>{description}</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="{min_version}" MaxVersionTested="{max_version_tested}" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="zh-TW" />
+  </Resources>
+
+  <Applications>
+    <!-- A PyInstaller-built Win32 program: runs as a full-trust desktop app inside the package. -->
+    <Application Id="qPdf2MD" Executable="qPdf2MD.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="{display_name}"
+        Description="{description}"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" ShortName="{display_name}" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Required by every full-trust desktop app; Partner Center asks for a one-line justification. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

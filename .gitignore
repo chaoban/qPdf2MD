@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# PyInstaller output. build_exe.bat writes these to %USERPROFILE%\.qpdf2mk instead of the
+# project folder: OneDrive ignores this file and would sync several hundred MB.
+build/
+dist/
