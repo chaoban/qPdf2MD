@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QScrollArea,
     QSplitter,
     QStackedWidget,
     QVBoxLayout,
@@ -40,6 +41,9 @@ from .widgets.preview import PreviewPanel
 from .widgets.settings_panel import SettingsPanel
 
 MAX_SCAN = 2000
+# Fits 1920x1080 at 150 % and 1366x768 at 125 % scaling. Width = panel minimums (240 + 440 + 320) plus margins and
+# splitter handles, which also leaves the header stepper its full width; the start page scrolls when the window is shorter.
+MIN_WINDOW = (1056, 560)
 
 
 def collect_pdfs(paths: Iterable[str | Path]) -> tuple[list[Path], bool]:
@@ -86,7 +90,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(f"{APP_NAME} — PDF 轉 Markdown")
         self.setWindowIcon(icons.app_icon())
-        self.setMinimumSize(1120, 720)
+        self.setMinimumSize(*MIN_WINDOW)
         self.setAcceptDrops(True)
 
         self.model = JobListModel(self)
@@ -105,7 +109,13 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         v.addWidget(self.stack, 1)
 
-        self.stack.addWidget(self._build_empty_page())
+        # The start page is taller than small laptop screens allow, so it scrolls instead of setting the minimum height.
+        start = QScrollArea(objectName="StartScroll")
+        start.setWidgetResizable(True)
+        start.setFrameShape(QFrame.Shape.NoFrame)
+        start.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        start.setWidget(self._build_empty_page())
+        self.stack.addWidget(start)
         workspace = QWidget(objectName="Workspace")
         wl = QHBoxLayout(workspace)
         wl.setContentsMargins(14, 8, 14, 14)
@@ -113,11 +123,11 @@ class MainWindow(QMainWindow):
         self.splitter.setHandleWidth(12)
         self.splitter.setChildrenCollapsible(False)
         self.files = FilesPanel(self.model)
-        self.files.setMinimumWidth(300)
+        self.files.setMinimumWidth(240)
         self.preview = PreviewPanel(self.renderer)
         self.preview.setMinimumWidth(440)
         self.options = SettingsPanel()
-        self.options.setMinimumWidth(330)
+        self.options.setMinimumWidth(320)  # narrower clips the settings form (it needs about 305 px)
         self.options.setMaximumWidth(460)
         for i, w in enumerate((self.files, self.preview, self.options)):
             self.splitter.addWidget(w)
@@ -250,12 +260,13 @@ class MainWindow(QMainWindow):
     def _restore(self) -> None:
         geo = self.store.value("geometry")
         if geo is not None:
+            # Qt shrinks and moves a saved geometry that no longer fits (e.g. back from a large external monitor).
             self.restoreGeometry(geo)
         else:
             screen = QGuiApplication.primaryScreen().availableGeometry()
-            w, h = min(1460, int(screen.width() * 0.9)), min(900, int(screen.height() * 0.9))
-            self.resize(w, h)
-            self.move(screen.center().x() - w // 2, screen.center().y() - h // 2)
+            self.resize(min(1460, int(screen.width() * 0.9)), min(900, int(screen.height() * 0.9)))
+            w, h = self.width(), self.height()  # the minimum size wins on very small screens
+            self.move(max(screen.left(), screen.center().x() - w // 2), max(screen.top(), screen.center().y() - h // 2))
         split = self.store.value("splitter")
         if split is not None:
             self.splitter.restoreState(split)
