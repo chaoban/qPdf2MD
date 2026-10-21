@@ -678,6 +678,7 @@ class PreviewPanel(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(18, 0, 12, 12)
         header.setSpacing(10)
+        self._header = header
         title_col = QVBoxLayout()
         title_col.setSpacing(1)
         self.title = QLabel("預覽", objectName="PanelTitle")
@@ -688,7 +689,7 @@ class PreviewPanel(QFrame):
             title_col.addWidget(label)
         header.addLayout(title_col, 1)
         self.tabs = SegmentedControl(self.TABS)
-        self.tabs.setFixedWidth(self.tabs.sizeHint().width() + 12)
+        self.tabs.setFixedWidth(self.tabs.full_width() + 12)
         self.tabs.changed.connect(self._on_tab)
         header.addWidget(self.tabs, 0, Qt.AlignmentFlag.AlignVCenter)
         header.addSpacing(4)
@@ -906,7 +907,22 @@ class PreviewPanel(QFrame):
         self.out_label.setText(result.output_path.name)
         self.out_label.setToolTip(str(result.output_path))
 
+    TITLE_ROOM = 150  # keep this much width for the file name before the view tabs drop their labels
+
+    def _fit_header(self) -> None:
+        """Show the view tabs as icons only when the panel is too narrow for their labels; otherwise the
+        tool buttons would be laid out on top of the tabs."""
+        m = self._header.contentsMargins()
+        spacing = self._header.spacing()
+        buttons = sum(b.sizeHint().width() + spacing for b in self.buttons.values())
+        room = self.width() - m.left() - m.right() - buttons - spacing - 4 - self.TITLE_ROOM
+        compact = room < self.tabs.full_width() + 12
+        if compact != self.tabs.isCompact() or self.tabs.width() != self.tabs.full_width(compact) + 12:
+            self.tabs.setCompact(compact)
+            self.tabs.setFixedWidth(self.tabs.full_width(compact) + 12)
+
     def resizeEvent(self, e):
         super().resizeEvent(e)
+        self._fit_header()
         for label in (self.title, self.subtitle):
             self._set_elided(label, label.property("fullText") or "")

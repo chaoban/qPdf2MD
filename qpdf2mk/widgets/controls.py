@@ -150,6 +150,7 @@ class SegmentedControl(QWidget):
         self._index = 0
         self._hover = -1
         self._pos = 0.0
+        self._compact = False  # icons only (labels move to tooltips) when the parent runs out of room
         self._anim = _animation(self, self._set_pos, 230)
         self.setFixedHeight(height)
         self.setMouseTracking(True)
@@ -161,9 +162,25 @@ class SegmentedControl(QWidget):
         self.setFont(f)
 
     def sizeHint(self) -> QSize:
+        return QSize(self.full_width(self._compact), self.height())
+
+    def full_width(self, compact: bool = False) -> int:
+        """Width the control needs to show every segment, with or without its label."""
+        if compact and all(ico for _, _, ico in self._items):
+            return 44 * len(self._items) + 6
         fm = QFontMetrics(self.font())
-        w = sum(fm.horizontalAdvance(label) + (22 if ico else 0) + 26 for _, label, ico in self._items) + 6
-        return QSize(w, self.height())
+        return sum(fm.horizontalAdvance(label) + (22 if ico else 0) + 26 for _, label, ico in self._items) + 6
+
+    def isCompact(self) -> bool:
+        return self._compact
+
+    def setCompact(self, compact: bool) -> None:
+        compact = compact and all(ico for _, _, ico in self._items)
+        if compact != self._compact:
+            self._compact = compact
+            self.setToolTip("")
+            self.updateGeometry()
+            self.update()
 
     def minimumSizeHint(self) -> QSize:
         return self.sizeHint()
@@ -203,6 +220,7 @@ class SegmentedControl(QWidget):
         idx = self._index_at(e.position().x())
         if idx != self._hover:
             self._hover = idx
+            self.setToolTip(self._items[idx][1] if self._compact else "")
             self.update()
 
     def leaveEvent(self, e):
@@ -247,13 +265,15 @@ class SegmentedControl(QWidget):
             active = i == self._index
             role = "text" if active or i == self._hover else "text_muted"
             color = p.color(role)
-            tw = fm.horizontalAdvance(label)
-            total = tw + (21 if ico else 0)
+            tw = 0 if self._compact else fm.horizontalAdvance(label)
+            total = tw + (21 if ico else 0) - (6 if self._compact else 0)
             x = r.center().x() - total / 2
             if ico:
                 icon_color = p.accent_hover if (active and p.is_dark) else (p.accent if active else getattr(p, role))
                 icons.paint(painter, ico, QRectF(x, r.center().y() - 7.5, 15, 15), icon_color, 2.0)
                 x += 21
+            if self._compact:
+                continue
             painter.setPen(color)
             painter.drawText(QRectF(x, r.top(), tw + 2, r.height()), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, label)
 
