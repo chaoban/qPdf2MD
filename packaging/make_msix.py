@@ -72,13 +72,13 @@ def msix_version(version: str) -> str:
 
 def load_identity() -> dict[str, str]:
     try:
-        data = json.loads(IDENTITY_FILE.read_text(encoding="utf-8"))
+        data = json.loads(IDENTITY_FILE.read_text(encoding="utf-8-sig"))  # tolerate a BOM from Notepad
     except (OSError, ValueError) as exc:
         raise BuildError(f"無法讀取 {IDENTITY_FILE}：{exc}") from exc
     ident = {k: str(data.get(k, "")).strip() for k in ("Name", "Publisher", "PublisherDisplayName")}
     if any(not v or "XXXX" in v for v in ident.values()):
         raise BuildError(
-            f"請先填寫 {IDENTITY_FILE.relative_to(ROOT)}：在 Partner Center 開啟 qPdf2MD →「產品管理」→"
+            f"請先填寫 packaging\\msix\\{IDENTITY_FILE.name}：在 Partner Center 開啟 qPdf2MD →「產品管理」→"
             "「產品身分識別」，把 Package/Identity/Name、Package/Identity/Publisher、"
             "Package/Properties/PublisherDisplayName 三個值原樣貼上。"
         )

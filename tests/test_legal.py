@@ -65,8 +65,21 @@ class MsixTests(unittest.TestCase):
         self.assertEqual(app.get("EntryPoint"), "Windows.FullTrustApplication")
 
     def test_placeholder_identity_rejected(self):
-        with self.assertRaises(self.m.BuildError):
-            self.m.load_identity()  # the committed file still holds the XXXX placeholders
+        saved = self.m.IDENTITY_FILE
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "store_identity.json"
+            path.write_text('{"Name": "XXXXX.qPdf2MD", "Publisher": "CN=XXXXXXXX", "PublisherDisplayName": "SAISAI"}',
+                            encoding="utf-8")
+            self.m.IDENTITY_FILE = path
+            try:
+                with self.assertRaises(self.m.BuildError):
+                    self.m.load_identity()
+            finally:
+                self.m.IDENTITY_FILE = saved
+
+    def test_committed_identity_is_valid(self):
+        ident = self.m.load_identity()
+        self.assertTrue(ident["Publisher"].startswith("CN="))
 
 
 if __name__ == "__main__":

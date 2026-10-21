@@ -15,7 +15,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Iterable, Optional
 
-from . import APP_NAME, APP_VERSION, CONTACT_EMAIL, COPYRIGHT, LICENSE_SPDX, SOURCE_URL
+from . import APP_NAME, APP_VERSION, CONTACT_EMAIL, COPYRIGHT, LICENSE_SPDX, PUBLISHER, SOURCE_URL
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTICES_NAME = "THIRD_PARTY_NOTICES.txt"
@@ -147,12 +147,12 @@ def _header() -> list[str]:
         f"Copyright (C) {COPYRIGHT.removeprefix('© ')}",
         f"Contact / 聯絡信箱: {CONTACT_EMAIL}",
         "",
-        f"{APP_NAME} 由 SAISAI 開發，依 GNU Affero 通用公眾授權條款第 3 版（{LICENSE_SPDX}）發布，",
+        f"{APP_NAME} 由 {PUBLISHER} 開發，依 GNU Affero 通用公眾授權條款第 3 版（{LICENSE_SPDX}）發布，",
         f"完整原始碼：{source}",
         "本軟體使用並隨附下列第三方元件，各元件依其原授權條款使用，著作權屬於各自的權利人。",
         "",
-        f"{APP_NAME} is developed by SAISAI and licensed under the GNU Affero General Public",
-        f"License version 3 ({LICENSE_SPDX}). Complete source code: {source}",
+        f"{APP_NAME} is developed by {PUBLISHER} and licensed under the GNU Affero General",
+        f"Public License version 3 ({LICENSE_SPDX}). Complete source code: {source}",
         "It uses and redistributes the third-party components listed below, each under its own",
         "license. Copyright in those components remains with their respective owners.",
         "",

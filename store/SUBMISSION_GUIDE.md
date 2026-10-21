@@ -39,7 +39,7 @@ qPdf2MD 內含 PyMuPDF、pymupdf4llm、PyMuPDF Layout（AGPL-3.0），所以整�
 4. **商店授權條款**：「其他授權條款」欄填 AGPL 聲明，見 3.5 節。Microsoft Store 的〈標準應用程式授權條款〉寫明：App 附有自己的條款時，以該條款為準，因此不會出現「禁止複製、禁止反向工程」這類與 AGPL 衝突的限制。
 5. **上游原始碼**（建議）：AGPL 元件的原始碼由上游公開（PyMuPDF、pymupdf4llm、PyMuPDF Layout 的 GitHub）。保險起見，可在儲存庫的 Release 附上這些套件對應版本的原始碼封存檔。
 
-**你仍保有的權利**：著作權仍屬於 SAISAI；SAISAI 名稱與標誌可主張商標，別人可以散佈程式，但不能用你的名稱與標誌上架冒充。
+**你仍保有的權利**：著作權仍屬於 SAISAI.Dev；SAISAI 名稱與標誌可主張商標，別人可以散佈程式，但不能用你的名稱與標誌上架冒充。
 
 ---
 
@@ -51,7 +51,7 @@ qPdf2MD 內含 PyMuPDF、pymupdf4llm、PyMuPDF Layout（AGPL-3.0），所以整�
 |---|---|---|
 | Package/Identity/Name | `Name` | `12345SAISAI.qPdf2MD` |
 | Package/Identity/Publisher | `Publisher` | `CN=1A2B3C4D-....` |
-| Package/Properties/PublisherDisplayName | `PublisherDisplayName` | `SAISAI` |
+| Package/Properties/PublisherDisplayName | `PublisherDisplayName` | `SAISAI.Dev` |
 
 三個值必須**一字不差**，否則上傳套件時會顯示身分不符。發行者顯示名稱（PublisherDisplayName）就是商店頁顯示的開發者名稱，在「帳戶設定」中設定。
 
@@ -225,7 +225,7 @@ MD
 **著作權與商標資訊（Copyright and trademark info）**：
 
 ```
-© 2026 SAISAI
+© 2026 SAISAI.Dev
 ```
 
 **其他授權條款（Additional license terms）**：
@@ -243,7 +243,7 @@ Complete source code (including build scripts): https://github.com/chaoban/qPdf2
 Third-party components are used under their own licenses; see "About > License information" in the app.
 ```
 
-**開發者（Developed by）**：`SAISAI`
+**開發者（Developed by）**：`SAISAI.Dev`
 
 **其他系統需求**：與 3.2 相同，可再寫一次。
 

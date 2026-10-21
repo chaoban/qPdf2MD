@@ -250,9 +250,9 @@ qPdf2MD 是自由軟體，依 [GNU Affero 通用公眾授權條款第 3 版（AG
 
 ## 版權與聯絡
 
-© 2026 SAISAI，依 GNU AGPL v3 授權發布。
+© 2026 SAISAI.Dev，依 GNU AGPL v3 授權發布。
 
 - 信箱：aisais.dev@gmail.com
 - 隱私權政策：[PRIVACY.md](PRIVACY.md)
 
-程式內的「關於」視窗（`F1` 或右上角 ⓘ）顯示 SAISAI 標誌、版權、AGPL 聲明與原始碼連結、Qt（LGPL v3）聲明，並提供「授權資訊」（第三方元件／GNU AGPL v3／GNU LGPL v3／GNU GPL v3 全文）與「關於 Qt」。這些文字集中在 `qpdf2mk/__init__.py`（`ORG_NAME`、`COPYRIGHT`、`CONTACT_EMAIL`、`LICENSE_NAME`、`SOURCE_URL`、`PRIVACY_URL`），修改一次即可同步到介面與 exe 檔案內容。安裝程式的發行者、版權與聯絡信箱另外寫在 `installer/qPdf2MD.iss`（`AppPublisher`、`AppCopyright`、`AppContact`），Store 版的發行者名稱寫在 `packaging/msix/store_identity.json`，需一併修改。
+程式內的「關於」視窗（`F1` 或右上角 ⓘ）顯示 SAISAI 標誌、版權、AGPL 聲明與原始碼連結、Qt（LGPL v3）聲明，並提供「授權資訊」（第三方元件／GNU AGPL v3／GNU LGPL v3／GNU GPL v3 全文）與「關於 Qt」。這些文字集中在 `qpdf2mk/__init__.py`（`PUBLISHER`、`COPYRIGHT`、`CONTACT_EMAIL`、`LICENSE_NAME`、`SOURCE_URL`、`PRIVACY_URL`），修改一次即可同步到介面與 exe 檔案內容。安裝程式的發行者、版權與聯絡信箱另外寫在 `installer/qPdf2MD.iss`（`AppPublisher`、`AppCopyright`、`AppContact`），Store 版的發行者名稱寫在 `packaging/msix/store_identity.json`，需一併修改。

@@ -12,8 +12,8 @@
   #define IconFile AddBackslash(GetEnv("USERPROFILE")) + ".qpdf2mk\build\qPdf2MD\qPdf2MD.ico"
 #endif
 #define AppName "qPdf2MD"
-#define AppPublisher "SAISAI"
-#define AppCopyright "© 2026 SAISAI. Licensed under the GNU AGPL v3."
+#define AppPublisher "SAISAI.Dev"
+#define AppCopyright "© 2026 SAISAI.Dev. Licensed under the GNU AGPL v3."
 #define AppExeName "qPdf2MD.exe"
 #if !FileExists(SourceDir + "\" + AppExeName)
   #error qPdf2MD.exe not found in SourceDir - run build_exe.bat first

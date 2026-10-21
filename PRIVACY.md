@@ -4,7 +4,7 @@
 
 ## 中文
 
-qPdf2MD（以下稱「本程式」）由 SAISAI 開發，是在你的電腦上執行的 PDF 轉 Markdown 工具。
+qPdf2MD（以下稱「本程式」）由 SAISAI.Dev 開發，是在你的電腦上執行的 PDF 轉 Markdown 工具。
 
 **我們不收集任何個人資料。**
 
@@ -22,7 +22,7 @@ qPdf2MD（以下稱「本程式」）由 SAISAI 開發，是在你的電腦上�
 
 ## English
 
-qPdf2MD ("the app") is developed by SAISAI. It is a PDF-to-Markdown converter that runs on your computer.
+qPdf2MD ("the app") is developed by SAISAI.Dev. It is a PDF-to-Markdown converter that runs on your computer.
 
 **We do not collect any personal information.**
 

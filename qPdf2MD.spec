@@ -18,7 +18,7 @@ ROOT = Path(SPECPATH)
 WORK = Path(workpath)
 sys.path.insert(0, str(ROOT))
 
-from qpdf2mk import APP_NAME, APP_TAGLINE, APP_VERSION, COPYRIGHT, LICENSE_SPDX, ORG_NAME  # noqa: E402  (plain constants, no Qt import)
+from qpdf2mk import APP_NAME, APP_TAGLINE, APP_VERSION, COPYRIGHT, LICENSE_SPDX, PUBLISHER  # noqa: E402  (plain constants, no Qt import)
 from qpdf2mk.legal import NOTICES_NAME, build_third_party_notices  # noqa: E402  (Qt-free)
 
 # Executable icon, rendered from qpdf2mk.icons.app_icon() so it always matches the window icon.
@@ -35,7 +35,7 @@ VERSION_FILE.write_text(
             kids=[
                 vi.StringFileInfo([
                     vi.StringTable("040404B0", [
-                        vi.StringStruct("CompanyName", ORG_NAME),
+                        vi.StringStruct("CompanyName", PUBLISHER),
                         vi.StringStruct("LegalCopyright", f"{COPYRIGHT}. Licensed under {LICENSE_SPDX}."),
                         vi.StringStruct("FileDescription", f"{APP_NAME} — {APP_TAGLINE}"),
                         vi.StringStruct("FileVersion", APP_VERSION),

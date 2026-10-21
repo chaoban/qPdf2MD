@@ -1,6 +1,6 @@
 """qPdf2MD — a polished Qt desktop app that converts PDF files to Markdown.
 
-Copyright (C) 2026 SAISAI
+Copyright (C) 2026 SAISAI.Dev
 
 This program is free software: you can redistribute it and/or modify it under the terms of the
 GNU Affero General Public License as published by the Free Software Foundation, version 3.
@@ -10,8 +10,9 @@ It is distributed WITHOUT ANY WARRANTY; see the LICENSE file for details.
 APP_NAME = "qPdf2MD"
 APP_TAGLINE = "PDF → Markdown 轉換器"
 APP_VERSION = "1.0.0"
-ORG_NAME = "SAISAI"  # publisher; Qt also files settings and logs under this name
-COPYRIGHT = "© 2026 SAISAI"
+PUBLISHER = "SAISAI.Dev"  # shown in the About box, file properties and the Store (PublisherDisplayName)
+ORG_NAME = "SAISAI"  # folder / registry name for settings and logs; keep it so existing settings carry over
+COPYRIGHT = f"© 2026 {PUBLISHER}"
 CONTACT_EMAIL = "aisais.dev@gmail.com"
 
 # qPdf2MD ships PyMuPDF / pymupdf4llm / PyMuPDF Layout under the AGPL-3.0, so the whole program is
