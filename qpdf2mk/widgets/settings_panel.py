@@ -21,8 +21,10 @@ from PySide6.QtWidgets import (
 
 from .. import icons
 from ..engine import ConvertOptions, parse_page_range
+from ..i18n import sep, tr
 from .controls import SegmentedControl, ToggleRow
 
+# Hint texts are message keys: translate them where they are shown.
 MODE_HINTS = {
     "layout": "以 AI 模型分析版面，精準辨識標題、清單、表格與閱讀順序，並自動略過頁首頁尾。每頁約需 1–2 秒。",
     "fast": "依字型大小推斷文件結構，速度極快，適合以文字為主、版面單純的文件。",
@@ -84,11 +86,11 @@ class SettingsPanel(QFrame):
 
         header = QHBoxLayout()
         header.setContentsMargins(20, 0, 12, 10)
-        header.addWidget(QLabel("轉換設定", objectName="PanelTitle"))
+        header.addWidget(QLabel(tr("轉換設定"), objectName="PanelTitle"))
         header.addStretch(1)
         self.reset_btn = QToolButton(objectName="Labeled")
-        self.reset_btn.setText(" 重設")
-        self.reset_btn.setToolTip("還原為預設設定")
+        self.reset_btn.setText(" " + tr("重設"))
+        self.reset_btn.setToolTip(tr("還原為預設設定"))
         self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.reset_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         icons.binder.bind(self.reset_btn, "refresh")
@@ -110,27 +112,28 @@ class SettingsPanel(QFrame):
         outer.addWidget(scroll, 1)
 
         # -- recognition mode
-        form.addWidget(_section("辨識模式"))
-        self.mode = SegmentedControl([("layout", "AI 版面分析", "sparkles"), ("fast", "快速模式", "zap")])
+        form.addWidget(_section(tr("辨識模式")))
+        self.mode = SegmentedControl([("layout", tr("AI 版面分析", context="segment"), "sparkles"),
+                                      ("fast", tr("快速模式", context="segment"), "zap")])
         form.addWidget(self.mode)
         self.mode_hint = _hint()
         form.addWidget(self.mode_hint)
         form.addSpacing(14)
 
         # -- OCR for scanned pages
-        form.addWidget(_section("文字辨識（OCR）"))
-        self.ocr = SegmentedControl([("auto", "自動", "scan"), ("always", "全部頁面", "pages"), ("off", "關閉", "x")])
+        form.addWidget(_section(tr("文字辨識（OCR）")))
+        self.ocr = SegmentedControl([("auto", tr("自動"), "scan"), ("always", tr("全部頁面", context="ocr"), "pages"), ("off", tr("關閉", context="ocr"), "x")])
         form.addWidget(self.ocr)
         self.ocr_hint = _hint()
         form.addWidget(self.ocr_hint)
         form.addSpacing(14)
 
         # -- page range
-        form.addWidget(_section("頁面範圍"))
-        self.pages = SegmentedControl([("all", "全部頁面"), ("custom", "指定頁面")])
+        form.addWidget(_section(tr("頁面範圍")))
+        self.pages = SegmentedControl([("all", tr("全部頁面")), ("custom", tr("指定頁面"))])
         form.addWidget(self.pages)
         self.page_range = QLineEdit()
-        self.page_range.setPlaceholderText("例如：1-5, 8, 12-")
+        self.page_range.setPlaceholderText(tr("例如：1-5, 8, 12-"))
         self.page_range.setClearButtonEnabled(True)
         form.addWidget(self.page_range)
         self.page_error = QLabel(objectName="ErrorText")
@@ -139,8 +142,9 @@ class SettingsPanel(QFrame):
         form.addSpacing(14)
 
         # -- images
-        form.addWidget(_section("圖片"))
-        self.images = SegmentedControl([("folder", "存成檔案", "image"), ("embed", "內嵌", "code"), ("none", "不輸出", "x")])
+        form.addWidget(_section(tr("圖片")))
+        self.images = SegmentedControl([("folder", tr("存成檔案"), "image"), ("embed", tr("內嵌"), "code"),
+                                        ("none", tr("不輸出"), "x")])
         form.addWidget(self.images)
         self.images_hint = _hint()
         form.addWidget(self.images_hint)
@@ -150,7 +154,7 @@ class SettingsPanel(QFrame):
         io.setSpacing(8)
         fmt_row = QHBoxLayout()
         fmt_row.setSpacing(12)
-        fmt_row.addWidget(QLabel("格式", objectName="FieldLabel"))
+        fmt_row.addWidget(QLabel(tr("格式"), objectName="FieldLabel"))
         fmt_row.addStretch(1)
         self.image_format = SegmentedControl([("png", "PNG"), ("jpg", "JPG")], height=30)
         self.image_format.setFixedWidth(130)
@@ -158,7 +162,7 @@ class SettingsPanel(QFrame):
         io.addLayout(fmt_row)
         dpi_row = QHBoxLayout()
         dpi_row.setSpacing(12)
-        dpi_row.addWidget(QLabel("解析度", objectName="FieldLabel"))
+        dpi_row.addWidget(QLabel(tr("解析度"), objectName="FieldLabel"))
         self.dpi = QSlider(Qt.Orientation.Horizontal)
         self.dpi.setRange(72, 300)
         self.dpi.setSingleStep(6)
@@ -174,19 +178,19 @@ class SettingsPanel(QFrame):
         form.addSpacing(14)
 
         # -- content
-        form.addWidget(_section("內容處理"))
-        self.strip = ToggleRow("移除頁首、頁尾與頁碼", "略過每頁重複出現的頁眉、頁腳與頁碼文字")
-        self.tidy = ToggleRow("自動整理格式", "合併斷行、修正清單縮排、清除多餘空行與標題粗體")
-        self.markers = ToggleRow("加入頁面分隔標記", "在每頁開頭插入 <!-- page N --> 註解，方便對照原稿")
-        self.front = ToggleRow("加入 YAML 前置資料", "於檔案開頭寫入標題、作者、來源與頁數（Front Matter）")
+        form.addWidget(_section(tr("內容處理")))
+        self.strip = ToggleRow(tr("移除頁首、頁尾與頁碼"), tr("略過每頁重複出現的頁眉、頁腳與頁碼文字"))
+        self.tidy = ToggleRow(tr("自動整理格式"), tr("合併斷行、修正清單縮排、清除多餘空行與標題粗體"))
+        self.markers = ToggleRow(tr("加入頁面分隔標記"), tr("在每頁開頭插入 <!-- page N --> 註解，方便對照原稿"))
+        self.front = ToggleRow(tr("加入 YAML 前置資料"), tr("於檔案開頭寫入標題、作者、來源與頁數（Front Matter）"))
         for row in (self.strip, self.tidy, self.markers, self.front):
             form.addWidget(row)
             form.addSpacing(4)
         form.addSpacing(10)
 
         # -- output
-        form.addWidget(_section("輸出位置"))
-        self.output = SegmentedControl([("same", "與 PDF 相同", "file"), ("custom", "指定資料夾", "folder")])
+        form.addWidget(_section(tr("輸出位置")))
+        self.output = SegmentedControl([("same", tr("與 PDF 相同"), "file"), ("custom", tr("指定資料夾"), "folder")])
         form.addWidget(self.output)
         self.dir_row = QWidget()
         dr = QHBoxLayout(self.dir_row)
@@ -194,18 +198,18 @@ class SettingsPanel(QFrame):
         dr.setSpacing(6)
         self.output_dir = QLineEdit()
         self.output_dir.setReadOnly(True)
-        self.output_dir.setPlaceholderText("尚未選擇資料夾")
+        self.output_dir.setPlaceholderText(tr("尚未選擇資料夾"))
         dr.addWidget(self.output_dir, 1)
-        self.browse = QPushButton("選擇…")
+        self.browse = QPushButton(tr("選擇…"))
         self.browse.setCursor(Qt.CursorShape.PointingHandCursor)
         self.browse.clicked.connect(self._browse)
         dr.addWidget(self.browse)
         form.addWidget(self.dir_row)
         conflict_row = QHBoxLayout()
         conflict_row.setSpacing(12)
-        conflict_row.addWidget(QLabel("檔名重複時", objectName="FieldLabel"))
+        conflict_row.addWidget(QLabel(tr("檔名重複時"), objectName="FieldLabel"))
         conflict_row.addStretch(1)
-        self.conflict = SegmentedControl([("rename", "自動改名"), ("overwrite", "覆寫")], height=30)
+        self.conflict = SegmentedControl([("rename", tr("自動改名")), ("overwrite", tr("覆寫"))], height=30)
         self.conflict.setFixedWidth(170)
         conflict_row.addWidget(self.conflict)
         form.addSpacing(2)
@@ -314,16 +318,16 @@ class SettingsPanel(QFrame):
         s = self.state()
         if s["pages"] == "custom":
             if not s["page_range"]:
-                return "請輸入要轉換的頁面範圍", self.page_range
+                return tr("請輸入要轉換的頁面範圍"), self.page_range
             try:
                 parse_page_range(s["page_range"], None)
             except ValueError as exc:
                 return str(exc), self.page_range
         if s["output"] == "custom":
             if not s["output_dir"]:
-                return "請先選擇輸出資料夾", self.browse
+                return tr("請先選擇輸出資料夾"), self.browse
             if not Path(s["output_dir"]).is_dir():
-                return "輸出資料夾不存在，請重新選擇", self.browse
+                return tr("輸出資料夾不存在，請重新選擇"), self.browse
         return None
 
     # ---- runtime state
@@ -352,34 +356,34 @@ class SettingsPanel(QFrame):
         pending, total = getattr(self, "_pending", 0), getattr(self, "_total", 0)
         btn = self.start_btn
         if self._running:
-            btn.setText("  停止轉換")
+            btn.setText("  " + tr("停止轉換"))
             icons.binder.bind(btn, "stop", "danger")
             btn.setEnabled(True)
-            self.summary.setText("轉換進行中，完成的檔案會即時出現在預覽中")
-            self.shortcut.setText("Esc 停止")
+            self.summary.setText(tr("轉換進行中，完成的檔案會即時出現在預覽中"))
+            self.shortcut.setText(tr("Esc 停止"))
             return
         icons.binder.bind(btn, "play", "on_accent")
         self.shortcut.setText("Ctrl + Enter")
         if total == 0:
-            btn.setText("  開始轉換")
+            btn.setText("  " + tr("開始轉換"))
             btn.setEnabled(False)
-            self.summary.setText("請先加入 PDF 檔案")
+            self.summary.setText(tr("請先加入 PDF 檔案"))
         elif pending == 0:
-            btn.setText(f"  全部重新轉換（{total}）")
+            btn.setText("  " + tr("全部重新轉換（{n}）", n=total))
             btn.setEnabled(True)
-            self.summary.setText(f"{total} 個檔案皆已轉換完成")
+            self.summary.setText(tr("{n} 個檔案皆已轉換完成", n=total))
         else:
-            btn.setText(f"  開始轉換（{pending}）" if pending > 1 else "  開始轉換")
+            btn.setText("  " + (tr("開始轉換（{n}）", n=pending) if pending > 1 else tr("開始轉換")))
             btn.setEnabled(True)
-            where = "原 PDF 所在資料夾" if self.output.value() == "same" else "指定資料夾"
-            self.summary.setText(f"{pending} 個檔案待轉換　·　輸出至{where}")
+            where = tr("輸出至原 PDF 所在資料夾") if self.output.value() == "same" else tr("輸出至指定資料夾")
+            self.summary.setText(tr("{n} 個檔案待轉換", n=pending) + sep() + where)
 
     def _on_primary(self) -> None:
         (self.stopRequested if self._running else self.startRequested).emit()
 
     def _browse(self) -> None:
         start = self.output_dir.text() or str(Path.home() / "Documents")
-        folder = QFileDialog.getExistingDirectory(self, "選擇 Markdown 輸出資料夾", start)
+        folder = QFileDialog.getExistingDirectory(self, tr("選擇 Markdown 輸出資料夾"), start)
         if folder:
             self.output_dir.setText(str(Path(folder)))
             self.output_dir.setToolTip(str(Path(folder)))
@@ -387,13 +391,13 @@ class SettingsPanel(QFrame):
 
     def _sync(self, *_):
         mode = self.mode.value()
-        hint = MODE_HINTS[mode]
+        hint = tr(MODE_HINTS[mode])
         if mode == "layout" and not self._layout_available:
-            hint = "AI 版面分析模組無法載入，將自動改用快速模式。"
+            hint = tr("AI 版面分析模組無法載入，將自動改用快速模式。")
         self.mode_hint.setText(hint)
-        ocr_hint = OCR_HINTS.get(self.ocr.value(), "")
+        ocr_hint = tr(OCR_HINTS.get(self.ocr.value(), ""))
         if self.ocr.value() != "off" and not self._ocr_available:
-            ocr_hint = "OCR 元件無法載入，掃描頁面將無法轉出文字。"
+            ocr_hint = tr("OCR 元件無法載入，掃描頁面將無法轉出文字。")
         self.ocr_hint.setText(ocr_hint)
         custom_pages = self.pages.value() == "custom"
         self.page_range.setVisible(custom_pages)
@@ -409,7 +413,7 @@ class SettingsPanel(QFrame):
         self.page_range.style().unpolish(self.page_range)
         self.page_range.style().polish(self.page_range)
         img = self.images.value()
-        self.images_hint.setText(IMAGE_HINTS[img])
+        self.images_hint.setText(tr(IMAGE_HINTS[img]))
         self.image_opts.setVisible(img != "none")
         self.dpi_label.setText(f"{self.dpi.value()} DPI")
         self.dir_row.setVisible(self.output.value() == "custom")

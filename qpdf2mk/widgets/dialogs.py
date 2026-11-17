@@ -34,6 +34,7 @@ from .. import (
     legal,
     theme,
 )
+from ..i18n import tr
 
 
 def _badge(name: str, role: str, size: int = 48, dpr: float = 1.0) -> QPixmap:
@@ -56,7 +57,7 @@ class PasswordDialog(QDialog):
     def __init__(self, parent, filename: str, validator: Callable[[str], bool]):
         super().__init__(parent)
         self._validator = validator
-        self.setWindowTitle("需要密碼")
+        self.setWindowTitle(tr("需要密碼"))
         self.setModal(True)
         self.setFixedWidth(440)
         theme.apply_window_frame(self, theme.current())
@@ -71,7 +72,7 @@ class PasswordDialog(QDialog):
         top.addWidget(badge, 0, Qt.AlignmentFlag.AlignTop)
         col = QVBoxLayout()
         col.setSpacing(2)
-        col.addWidget(QLabel("此 PDF 受密碼保護", objectName="StateTitle"))
+        col.addWidget(QLabel(tr("此 PDF 受密碼保護"), objectName="StateTitle"))
         name = QLabel(filename, objectName="Hint")
         name.setWordWrap(True)
         col.addWidget(name)
@@ -80,9 +81,9 @@ class PasswordDialog(QDialog):
 
         self.edit = QLineEdit()
         self.edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.edit.setPlaceholderText("輸入開啟密碼")
+        self.edit.setPlaceholderText(tr("輸入開啟密碼"))
         self.edit.setMinimumHeight(38)
-        self._reveal = QAction(icons.themed("eye"), "顯示密碼", self.edit)
+        self._reveal = QAction(icons.themed("eye"), tr("顯示密碼"), self.edit)
         self._reveal.triggered.connect(self._toggle_reveal)
         self.edit.addAction(self._reveal, QLineEdit.ActionPosition.TrailingPosition)
         layout.addWidget(self.edit)
@@ -92,11 +93,11 @@ class PasswordDialog(QDialog):
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
-        skip = QPushButton("略過此檔案")
+        skip = QPushButton(tr("略過此檔案"))
         skip.setCursor(Qt.CursorShape.PointingHandCursor)
         skip.clicked.connect(self.reject)
         buttons.addWidget(skip)
-        self.ok = QPushButton("解鎖", objectName="Primary")
+        self.ok = QPushButton(tr("解鎖"), objectName="Primary")
         self.ok.setCursor(Qt.CursorShape.PointingHandCursor)
         self.ok.setDefault(True)
         self.ok.clicked.connect(self._try)
@@ -114,12 +115,12 @@ class PasswordDialog(QDialog):
 
     def _try(self):
         if not self.edit.text():
-            self._show_error("請輸入密碼")
+            self._show_error(tr("請輸入密碼"))
             return
         if self._validator(self.edit.text()):
             self.accept()
         else:
-            self._show_error("密碼不正確，請再試一次")
+            self._show_error(tr("密碼不正確，請再試一次"))
 
     def _show_error(self, msg: str):
         self.error.setText(msg)
@@ -157,7 +158,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent, engine_text: str):
         super().__init__(parent)
         p = theme.current()
-        self.setWindowTitle(f"關於 {APP_NAME}")
+        self.setWindowTitle(tr("關於 {app}", app=APP_NAME))
         self.setModal(True)
         theme.apply_window_frame(self, p)
         width = 508  # content width
@@ -179,8 +180,8 @@ class AboutDialog(QDialog):
         col = QVBoxLayout()
         col.setSpacing(2)
         col.addWidget(QLabel(APP_NAME, objectName="AboutName"))
-        col.addWidget(QLabel(f"版本 {APP_VERSION}", objectName="AboutMeta"))
-        col.addWidget(QLabel(APP_TAGLINE, objectName="AboutMeta"))
+        col.addWidget(QLabel(tr("版本 {version}", version=APP_VERSION), objectName="AboutMeta"))
+        col.addWidget(QLabel(tr(APP_TAGLINE), objectName="AboutMeta"))
         ident.addLayout(col, 1)
         layout.addLayout(ident)
         layout.addSpacing(18)
@@ -189,22 +190,23 @@ class AboutDialog(QDialog):
 
         layout.addWidget(QLabel(COPYRIGHT, objectName="AboutStrong"))
         layout.addSpacing(6)
-        source = _link(SOURCE_URL) if SOURCE_URL else f"<span style='color:{p.danger}'>（尚未公開）</span>"
+        source = _link(SOURCE_URL) if SOURCE_URL else f"<span style='color:{p.danger}'>{tr('（尚未公開）')}</span>"
         layout.addWidget(_rich_label(
-            f"{APP_NAME} 是自由軟體，依 {LICENSE_NAME} 授權發布，不提供任何擔保。<br>原始碼：{source}", width
+            tr("{app} 是自由軟體，依 {license} 授權發布，不提供任何擔保。", app=APP_NAME, license=LICENSE_NAME)
+            + "<br>" + tr("原始碼：{url}", url=source), width
         ))
         layout.addSpacing(12)
-        contact = f"聯絡信箱：{_link('mailto:' + CONTACT_EMAIL, CONTACT_EMAIL)}"
+        contact = tr("聯絡信箱：{email}", email=_link("mailto:" + CONTACT_EMAIL, CONTACT_EMAIL))
         if PRIVACY_URL:
-            contact += f"<br>隱私權政策：{_link(PRIVACY_URL)}"
+            contact += "<br>" + tr("隱私權政策：{url}", url=_link(PRIVACY_URL))
         layout.addWidget(_rich_label(contact, width))
         layout.addSpacing(12)
-        layout.addWidget(_rich_label(
-            f"本軟體使用 Qt {qVersion()} 開發，Qt 依 GNU LGPL v3 授權使用。<br>"
-            f"Qt 原始碼：{_link(legal.QT_OPEN_SOURCE_URL)}<br>"
-            "PDF 轉換使用 PyMuPDF／pymupdf4llm（GNU AGPL v3），文字辨識使用 RapidOCR（Apache 2.0）。<br>"
-            "其他第三方元件與授權全文請見「授權資訊」。", width
-        ))
+        layout.addWidget(_rich_label("<br>".join((
+            tr("本軟體使用 Qt {version} 開發，Qt 依 GNU LGPL v3 授權使用。", version=qVersion()),
+            tr("Qt 原始碼：{url}", url=_link(legal.QT_OPEN_SOURCE_URL)),
+            tr("PDF 轉換使用 PyMuPDF／pymupdf4llm（GNU AGPL v3），文字辨識使用 RapidOCR（Apache 2.0）。"),
+            tr("其他第三方元件與授權全文請見「授權資訊」。"),
+        )), width))
         if engine_text:
             layout.addSpacing(8)
             layout.addWidget(_rich_label(engine_text, width, "Faint"))
@@ -214,9 +216,9 @@ class AboutDialog(QDialog):
         buttons.setSpacing(10)
         buttons.addStretch(1)
         actions = (
-            ("授權資訊…", self._show_licenses),
-            ("關於 Qt…", lambda: QMessageBox.aboutQt(self, "關於 Qt")),
-            ("關閉", self.accept),
+            (tr("授權資訊…"), self._show_licenses),
+            (tr("關於 Qt…"), lambda: QMessageBox.aboutQt(self, tr("關於 Qt"))),
+            (tr("關閉"), self.accept),
         )
         for text, slot in actions:
             btn = QPushButton(text)
@@ -224,7 +226,7 @@ class AboutDialog(QDialog):
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(slot)
             buttons.addWidget(btn)
-        btn.setDefault(True)  # 關閉
+        btn.setDefault(True)  # the Close button
         layout.addLayout(buttons)
 
     def _show_licenses(self) -> None:
@@ -236,7 +238,7 @@ class LicensesDialog(QDialog):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle(f"授權資訊 — {APP_NAME}")
+        self.setWindowTitle(tr("授權資訊 — {app}", app=APP_NAME))
         self.setModal(True)
         theme.apply_window_frame(self, theme.current())
         screen = (parent.screen() if parent is not None else None) or QGuiApplication.primaryScreen()
@@ -250,7 +252,7 @@ class LicensesDialog(QDialog):
         tabs.setDocumentMode(True)
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)  # notices are generated live when run from source
         try:
-            pages = [("第三方元件", legal.third_party_notices())]
+            pages = [(tr("第三方元件"), legal.third_party_notices())]
             pages += [(title, legal.license_text(name)) for title, name in legal.LICENSE_TABS]
         finally:
             QApplication.restoreOverrideCursor()
@@ -265,7 +267,7 @@ class LicensesDialog(QDialog):
 
         row = QHBoxLayout()
         row.addStretch(1)
-        close = QPushButton("關閉")
+        close = QPushButton(tr("關閉"))
         close.setMinimumWidth(104)
         close.setDefault(True)
         close.setCursor(Qt.CursorShape.PointingHandCursor)

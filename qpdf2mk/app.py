@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import sys
-import traceback
-from datetime import datetime
+import threading
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QStandardPaths, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QLibraryInfo, QLocale, QSettings, Qt, QThread, QTimer, QTranslator, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
-from . import APP_NAME, ORG_NAME, icons, theme
+from . import APP_NAME, ORG_NAME, errorlog, i18n, icons, theme
 from .engine import load_engine
 from .main_window import MainWindow
 from .theme import ThemeManager
@@ -27,24 +26,33 @@ class EngineLoader(QThread):
         try:
             self.loaded.emit(load_engine())
         except Exception as exc:  # pragma: no cover - depends on the environment
-            traceback.print_exc()
+            errorlog.log_exception()
             self.failed.emit(f"{type(exc).__name__}: {exc}")
 
 
 def _install_excepthook() -> None:
-    log_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
-
     def hook(exc_type, exc, tb):
-        text = "".join(traceback.format_exception(exc_type, exc, tb))
-        try:
-            log_dir.mkdir(parents=True, exist_ok=True)
-            with open(log_dir / "error.log", "a", encoding="utf-8") as fh:
-                fh.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}]\n{text}")
-        except OSError:
-            pass
-        sys.__stderr__ and sys.__stderr__.write(text)
+        errorlog.log_exception((exc_type, exc, tb))
 
     sys.excepthook = hook
+    threading.excepthook = lambda a: errorlog.log_exception((a.exc_type, a.exc_value, a.exc_traceback))
+
+
+def _install_qt_translations(app: QApplication, language: str) -> None:
+    """Qt's own texts (line-edit context menu, standard dialog buttons) in the UI language."""
+    name = i18n.qt_locale_name(language)
+    QLocale.setDefault(QLocale(name))
+    if language == "en":
+        return  # Qt's built-in texts are English already
+    folders = [Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath))]
+    base = getattr(sys, "_MEIPASS", None)
+    if base:  # PyInstaller bundle
+        folders += [Path(base) / "PySide6" / "translations", Path(base) / "PySide6" / "Qt" / "translations"]
+    for folder in folders:
+        translator = QTranslator(app)
+        if translator.load(f"qtbase_{name}", str(folder)):
+            app.installTranslator(translator)
+            return
 
 
 def is_packaged() -> bool:
@@ -81,6 +89,9 @@ def create_app(argv: list[str], settings: QSettings | None = None) -> tuple[QApp
     _install_excepthook()
 
     settings = settings or QSettings(ORG_NAME, APP_NAME)
+    # The UI language is fixed for the lifetime of the process; changing it in the menu asks for a restart.
+    language = i18n.set_language(i18n.resolve(settings.value(i18n.SETTING_KEY, i18n.SYSTEM)))
+    _install_qt_translations(app, language)
     tm = ThemeManager(app, str(settings.value("theme", "system")))
     tm.apply(force=True)
 

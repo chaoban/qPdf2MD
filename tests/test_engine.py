@@ -18,6 +18,9 @@ from qpdf2mk.engine import (  # noqa: E402
     resolve_output_path,
 )
 from qpdf2mk.tidy import count_words, tidy_markdown  # noqa: E402
+from qpdf2mk import i18n  # noqa: E402
+
+i18n.set_language("zh_TW")  # some assertions read the (Chinese) progress messages
 
 HTML = """<h1>Quarterly Report 季度報告</h1>
 <p>Plain paragraph with <b>bold</b> text. 這是繁體中文段落。</p>

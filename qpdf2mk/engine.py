@@ -20,11 +20,12 @@ import os
 import re
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Callable, Optional
 
+from .i18n import tr
 from .tidy import count_words, tidy_markdown
 
 ProgressFn = Callable[[float, str], None]
@@ -36,7 +37,7 @@ class ConversionError(Exception):
 
 class PasswordRequired(ConversionError):
     def __init__(self, wrong: bool = False):
-        super().__init__("密碼錯誤，請重新輸入" if wrong else "此 PDF 受密碼保護")
+        super().__init__(tr("密碼錯誤，請重新輸入") if wrong else tr("此 PDF 受密碼保護"))
         self.wrong = wrong
 
 
@@ -72,6 +73,21 @@ class ConvertResult:
     title: str
     mode: str
     ocr_pages: int = 0
+    _released: bool = field(default=False, repr=False)
+
+    def release(self) -> None:
+        """Drop the in-memory Markdown (the file on disk keeps it); load_markdown() brings it back on demand."""
+        self.markdown = ""
+        self._released = True
+
+    def load_markdown(self) -> str:
+        if self._released:
+            try:
+                self.markdown = self.output_path.read_text(encoding="utf-8")
+            except OSError:
+                return ""  # moved or deleted since; stay released
+            self._released = False
+        return self.markdown
 
 
 @dataclass
@@ -141,8 +157,8 @@ def _progress_bar(items, *args, **kwargs):
 
 
 class _Tracker:
-    # (start, end, label) of each pymupdf4llm phase on the overall 0..1 scale
-    PHASES = ((0.03, 0.90, "正在分析第 {i} / {n} 頁"), (0.90, 0.95, "正在產生 Markdown {i} / {n}"))
+    # (start, end, label) of each pymupdf4llm phase on the overall 0..1 scale; labels are message keys
+    PHASES = ((0.03, 0.90, "正在分析第 {i} / {total} 頁"), (0.90, 0.95, "正在產生 Markdown {i} / {total}"))
 
     def __init__(self, progress: Optional[ProgressFn], cancel: Optional[threading.Event]):
         self._progress = progress
@@ -165,7 +181,7 @@ class _Tracker:
 
         def run(page, dpi=OCR_DPI, language=None, keep_ocr_text=False):
             self.check()
-            self.emit(self.fraction, f"正在辨識第 {page.number + 1} 頁的文字（OCR）")
+            self.emit(self.fraction, tr("正在辨識第 {page} 頁的文字（OCR）", page=page.number + 1))
             exec_ocr(page, dpi=dpi, language=language, keep_ocr_text=keep_ocr_text)
             self.ocr_pages += 1
 
@@ -177,9 +193,9 @@ class _Tracker:
         n = len(items) or 1
         for i, item in enumerate(items):
             self.check()
-            self.emit(start + (end - start) * i / n, label.format(i=i + 1, n=n))
+            self.emit(start + (end - start) * i / n, tr(label, i=i + 1, total=n))
             yield item
-        self.emit(end, label.format(i=n, n=n))
+        self.emit(end, tr(label, i=n, total=n))
 
 
 # --------------------------------------------------------------------------- helpers
@@ -194,7 +210,7 @@ def parse_page_range(spec: str, page_count: Optional[int]) -> list[int]:
     With ``page_count=None`` only the syntax is validated (used for live UI feedback).
     Raises ValueError with a user-facing message.
     """
-    spec = re.sub(r"\s*[-~–—至到]\s*", "-", (spec or "").strip())
+    spec = re.sub(r"\s*(?:[-~–—至到]|\bto\b)\s*", "-", (spec or "").strip(), flags=re.I)
     if not spec:
         return list(range(page_count or 0))
     limit = page_count if page_count is not None else 10**9
@@ -209,16 +225,16 @@ def parse_page_range(spec: str, page_count: Optional[int]) -> list[int]:
         elif token.isdigit():
             a = b = int(token)
         else:
-            raise ValueError(f"無法辨識「{token}」，請使用像 1-3, 5, 8- 的格式")
+            raise ValueError(tr("無法辨識「{token}」，請使用像 1-3, 5, 8- 的格式", token=token))
         if a > b:
             a, b = b, a
         if a < 1:
-            raise ValueError("頁碼從 1 開始")
+            raise ValueError(tr("頁碼從 1 開始"))
         if a > limit:
-            raise ValueError(f"第 {a} 頁超出範圍（此文件共 {limit} 頁）")
+            raise ValueError(tr("第 {page} 頁超出範圍（此文件共 {n} 頁）", page=a, n=limit))
         pages.update(range(a - 1, min(b, limit)))
     if not pages:
-        raise ValueError("頁面範圍是空的")
+        raise ValueError(tr("頁面範圍是空的"))
     return sorted(pages)
 
 
@@ -260,10 +276,30 @@ def _export_images(text: str, page_no: int, md_path: Path) -> tuple[str, int]:
         name = f"p{page_no:03d}-{count:02d}.{ext}"
         folder.mkdir(parents=True, exist_ok=True)
         (folder / name).write_bytes(base64.b64decode(m.group(3)))
-        alt = m.group(1).strip() or f"第 {page_no} 頁圖片 {count}"
+        alt = m.group(1).strip() or tr("第 {page} 頁圖片 {i}", page=page_no, i=count)
         return f"![{alt}]({_md_link_target(f'{folder.name}/{name}')})"
 
     return _DATA_IMAGE.sub(replace, text), count
+
+
+_STALE_IMAGE = re.compile(r"p\d{3}-\d{2}\.(?:png|jpe?g|gif|webp|bmp|tiff?)", re.I)
+
+
+def _clear_old_images(md_path: Path) -> None:
+    """Remove images this app wrote on an earlier run, so overwriting does not leave orphans behind."""
+    folder = images_dir_for(md_path)
+    if not folder.is_dir():
+        return
+    for f in folder.iterdir():
+        if f.is_file() and _STALE_IMAGE.fullmatch(f.name):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+    try:
+        folder.rmdir()  # only succeeds when nothing of the user's is inside
+    except OSError:
+        pass
 
 
 def _yaml_str(value: str) -> str:
@@ -286,17 +322,17 @@ def convert_pdf(
     started = time.perf_counter()
     source = Path(source)
     tracker = _Tracker(progress, cancel_event)
-    tracker.emit(0.0, "正在載入轉換引擎")
+    tracker.emit(0.0, tr("正在載入轉換引擎"))
     info = load_engine()
     tracker.check()
-    tracker.emit(0.01, "正在開啟文件")
+    tracker.emit(0.01, tr("正在開啟文件"))
 
     if not source.is_file():
-        raise ConversionError("找不到檔案，可能已被移動或刪除")
+        raise ConversionError(tr("找不到檔案，可能已被移動或刪除"))
     try:
         doc = pymupdf.open(source)
     except Exception as exc:  # corrupt / not a PDF
-        raise ConversionError(f"無法開啟 PDF：{exc}") from exc
+        raise ConversionError(tr("無法開啟 PDF：{error}", error=exc)) from exc
 
     try:
         if doc.needs_pass:
@@ -305,7 +341,7 @@ def convert_pdf(
             if not doc.authenticate(password):
                 raise PasswordRequired(wrong=True)
         if doc.page_count == 0:
-            raise ConversionError("這份 PDF 沒有任何頁面")
+            raise ConversionError(tr("這份 PDF 沒有任何頁面"))
         try:
             pages = parse_page_range(options.page_range, doc.page_count)
         except ValueError as exc:
@@ -322,9 +358,11 @@ def convert_pdf(
         doc.close()
 
     tracker.check()
-    tracker.emit(0.96, "正在整理並寫入檔案")
+    tracker.emit(0.96, tr("正在整理並寫入檔案"))
     output_path = resolve_output_path(source, options)
 
+    if options.images == "folder":
+        _clear_old_images(output_path)
     parts: list[str] = []
     image_count = 0
     for page_no, text in chunks:
@@ -362,7 +400,7 @@ def convert_pdf(
     tmp = output_path.with_name(output_path.name + ".part")
     tmp.write_text(markdown, encoding="utf-8", newline="\n")
     os.replace(tmp, output_path)
-    tracker.emit(1.0, "完成")
+    tracker.emit(1.0, tr("完成"))
 
     return ConvertResult(
         source=source,
@@ -385,7 +423,7 @@ def _convert_layout(doc, pages, options, with_images, tracker) -> list[tuple[int
     _local.tracker = tracker
     try:
         tracker.phase = 0
-        tracker.emit(0.03, "正在進行 AI 版面分析")
+        tracker.emit(0.03, tr("正在進行 AI 版面分析"))
         parsed = layout.parse_document(
             doc,
             image_dpi=options.image_dpi,
@@ -434,14 +472,14 @@ def _convert_fast(doc, pages, options, with_images, tracker) -> list[tuple[int, 
             start = 0.60
             for i, pno in enumerate(pages):
                 tracker.check()
-                tracker.emit(0.03 + 0.57 * i / n, f"正在檢查第 {i + 1} / {n} 頁是否需要 OCR")
+                tracker.emit(0.03 + 0.57 * i / n, tr("正在檢查第 {i} / {total} 頁是否需要 OCR", i=i + 1, total=n))
                 page = doc[pno]
                 if make_ocr_decision(page, ocr_mode)[0]:
                     page.remove_rotation()
                     run_ocr(page)
                     if _is_scan(page):
                         scans.add(pno)
-        tracker.emit(start - 0.02, "正在分析字型結構")
+        tracker.emit(start - 0.02, tr("正在分析字型結構"))
         headers = rag.IdentifyHeaders(doc, pages=pages)
         if tracker.ocr_pages:
             # OCR text is sized by its line box, which wobbles from line to line;
@@ -450,7 +488,7 @@ def _convert_fast(doc, pages, options, with_images, tracker) -> list[tuple[int, 
         chunks: list[tuple[int, str]] = []
         for i, pno in enumerate(pages):
             tracker.check()
-            tracker.emit(start + (0.95 - start) * i / n, f"正在轉換第 {i + 1} / {n} 頁")
+            tracker.emit(start + (0.95 - start) * i / n, tr("正在轉換第 {i} / {total} 頁", i=i + 1, total=n))
             page_images = with_images and pno not in scans  # the text already came out of the scan
             text = rag.to_markdown(
                 doc,

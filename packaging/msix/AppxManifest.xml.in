@@ -21,8 +21,10 @@
     <TargetDeviceFamily Name="Windows.Desktop" MinVersion="{min_version}" MaxVersionTested="{max_version_tested}" />
   </Dependencies>
 
+  <!-- UI languages (qpdf2mk/i18n). The first one is the package default and matches MakePri /dq in make_msix.py. -->
   <Resources>
     <Resource Language="zh-TW" />
+    <Resource Language="en-US" />
   </Resources>
 
   <Applications>

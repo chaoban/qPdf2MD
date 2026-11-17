@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import icons, theme
+from ..i18n import sep, tr
 from .controls import _animation, blend
 
 _KIND = {
@@ -192,9 +193,9 @@ class DragOverlay(QWidget):
 
     def present(self, count: int, folders: bool):
         if count:
-            self._title = f"放開以加入 {count} 個 PDF 檔案"
+            self._title = tr("放開以加入 {n} 個 PDF 檔案", n=count)
         else:
-            self._title = "放開以加入資料夾中的 PDF" if folders else "放開以加入檔案"
+            self._title = tr("放開以加入資料夾中的 PDF") if folders else tr("放開以加入檔案")
         self.setGeometry(self.parentWidget().rect())
         self.show()
         self.raise_()
@@ -233,7 +234,7 @@ class DragOverlay(QWidget):
         painter.drawText(QRectF(r.left(), c.y() + 24, r.width(), 30), Qt.AlignmentFlag.AlignCenter, self._title)
         painter.setPen(p.color("text_muted"))
         painter.setFont(theme.ui_font(10))
-        painter.drawText(QRectF(r.left(), c.y() + 56, r.width(), 24), Qt.AlignmentFlag.AlignCenter, "也可以直接拖曳整個資料夾")
+        painter.drawText(QRectF(r.left(), c.y() + 56, r.width(), 24), Qt.AlignmentFlag.AlignCenter, tr("也可以直接拖曳整個資料夾"))
 
 
 # --------------------------------------------------------------------------- drop zone
@@ -260,15 +261,15 @@ class DropZone(QWidget):
         self._badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._badge, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addSpacing(18)
-        self._title = QLabel("拖曳 PDF 檔案到這裡", objectName="StateTitle")
+        self._title = QLabel(tr("拖曳 PDF 檔案到這裡"), objectName="StateTitle")
         self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._title)
         layout.addSpacing(6)
-        sub = QLabel("或點擊此處選擇檔案　·　可一次加入多個檔案或整個資料夾", objectName="StateText")
+        sub = QLabel(tr("或點擊此處選擇檔案") + sep() + tr("可一次加入多個檔案或整個資料夾"), objectName="StateText")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(sub)
         layout.addSpacing(22)
-        self.button = QPushButton("  選擇 PDF 檔案", objectName="Primary")
+        self.button = QPushButton("  " + tr("選擇 PDF 檔案"), objectName="Primary")
         self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         icons.binder.bind(self.button, "folder-open", "on_accent")
         self.button.clicked.connect(self.clicked)

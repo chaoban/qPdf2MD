@@ -18,11 +18,13 @@ from PySide6.QtWidgets import (
 )
 
 from .. import icons, theme
+from ..i18n import sep, tr
 from ..jobs import Job, JobListModel, Status, human_size
 
 CARD_H = 86
 GAP = 8
 
+# Badge labels are message keys: translate them where they are painted.
 _BADGES = {
     Status.PENDING: ("待轉換", "text_muted", None),
     Status.QUEUED: ("排隊中", "text_muted", "clock"),
@@ -130,17 +132,18 @@ class JobDelegate(QStyledItemDelegate):
         painter.setFont(self._meta_font)
         painter.setPen(p.color("text_muted"))
         if job.status == Status.LOCKED and not job.page_count:
-            meta = f"已加密　·　{human_size(job.size)}"
+            meta = tr("已加密") + sep() + human_size(job.size)
         elif job.page_count:
-            meta = f"{job.page_count} 頁　·　{human_size(job.size)}"
+            meta = tr("{n} 頁", n=job.page_count) + sep() + human_size(job.size)
         else:
-            meta = f"讀取中…　·　{human_size(job.size)}"
+            meta = tr("讀取中…") + sep() + human_size(job.size)
         painter.drawText(QRectF(x, card.top() + 32, card.right() - x - 14, 18), Qt.AlignmentFlag.AlignVCenter, meta)
 
         # -- status badge + detail
         label, role, icon_name = _BADGES[job.status]
+        label = tr(label)
         if job.status == Status.RUNNING:
-            label = f"轉換中 {round(job.progress * 100)}%"
+            label = tr("轉換中 {pct}%", pct=round(job.progress * 100))
         fm = QFontMetrics(self._badge_font)
         bw = fm.horizontalAdvance(label) + 18 + (15 if icon_name else 0)
         badge = QRectF(x, card.top() + 54, bw, 20)
@@ -194,7 +197,7 @@ class JobDelegate(QStyledItemDelegate):
         if job.status == Status.FAILED:
             return job.error
         if job.status == Status.LOCKED:
-            return "點兩下輸入密碼"
+            return tr("點兩下輸入密碼")
         return ""
 
     def editorEvent(self, event, model, option, index) -> bool:
@@ -274,25 +277,25 @@ class FilesPanel(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(18, 0, 12, 0)
         header.setSpacing(8)
-        header.addWidget(QLabel("檔案佇列", objectName="PanelTitle"))
+        header.addWidget(QLabel(tr("檔案佇列"), objectName="PanelTitle"))
         self.count = QLabel("0", objectName="CountBadge")
         header.addWidget(self.count)
         header.addStretch(1)
         self.add_btn = QToolButton()
-        self.add_btn.setToolTip("加入 PDF 檔案（Ctrl+O）")
+        self.add_btn.setToolTip(tr("加入 PDF 檔案（Ctrl+O）"))
         self.add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         icons.binder.bind(self.add_btn, "plus")
         self.add_btn.clicked.connect(self.addRequested)
         header.addWidget(self.add_btn)
         self.more_btn = QToolButton()
-        self.more_btn.setToolTip("更多動作")
+        self.more_btn.setToolTip(tr("更多動作"))
         self.more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.more_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         icons.binder.bind(self.more_btn, "more")
         menu = styled_menu(self)
-        self.act_clear_done = menu.addAction("清除已完成的檔案")
+        self.act_clear_done = menu.addAction(tr("清除已完成的檔案"))
         self.act_clear_done.triggered.connect(self.clearDoneRequested)
-        self.act_clear_all = menu.addAction("移除全部檔案")
+        self.act_clear_all = menu.addAction(tr("移除全部檔案"))
         self.act_clear_all.triggered.connect(self.clearAllRequested)
         self.more_btn.setMenu(menu)
         header.addWidget(self.more_btn)
@@ -301,8 +304,9 @@ class FilesPanel(QFrame):
         self.view = JobListView(model)
         layout.addWidget(self.view, 1)
 
-        hint = QLabel("拖曳 PDF 或資料夾到視窗任意處即可加入", objectName="Faint")
+        hint = QLabel(tr("拖曳 PDF 或資料夾到視窗任意處即可加入"), objectName="Faint")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setWordWrap(True)  # keeps the panel's minimum width with longer translations
         layout.addWidget(hint)
 
     def refresh_theme(self, *_):

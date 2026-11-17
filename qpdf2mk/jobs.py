@@ -5,7 +5,6 @@ from __future__ import annotations
 import itertools
 import threading
 import time
-import traceback
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from enum import Enum
@@ -32,6 +31,8 @@ from .engine import (
     PasswordRequired,
     convert_pdf,
 )
+from . import errorlog
+from .i18n import tr
 
 
 class Status(Enum):
@@ -181,12 +182,12 @@ class _ConvertWorker(QObject):
         except ConversionError as exc:
             self.failed.emit(job_id, str(exc), False)
         except PermissionError as exc:
-            self.failed.emit(job_id, f"沒有寫入權限：{exc.filename or exc}", False)
+            self.failed.emit(job_id, tr("沒有寫入權限：{path}", path=exc.filename or exc), False)
         except OSError as exc:
-            self.failed.emit(job_id, f"檔案存取失敗：{exc}", False)
+            self.failed.emit(job_id, tr("檔案存取失敗：{error}", error=exc), False)
         except Exception as exc:  # unexpected engine failure: keep the app alive
-            traceback.print_exc()
-            self.failed.emit(job_id, f"轉換時發生錯誤：{type(exc).__name__}: {exc}", False)
+            errorlog.log_exception()
+            self.failed.emit(job_id, tr("轉換時發生錯誤：{error}", error=f"{type(exc).__name__}: {exc}"), False)
         else:
             self.finished.emit(job_id, result)
 
@@ -330,10 +331,7 @@ class RenderService(QObject):
 
     def probe(self, job_id: int, path: Path, password: Optional[str] = None) -> None:
         key = str(path)
-        if password:
-            self._passwords[key] = password
-            self._docs.pop(key, None)  # reopen with the password next time
-        self._pool.start(lambda: self._do_probe(job_id, key))
+        self._pool.start(lambda: self._do_probe(job_id, key, password))
 
     def render(self, path: Path, page: int, width_px: int, generation: int) -> None:
         req = (str(path), page, width_px, generation)
@@ -344,8 +342,7 @@ class RenderService(QObject):
 
     def forget(self, path: Path) -> None:
         key = str(path)
-        self._passwords.pop(key, None)
-        self._pool.start(lambda: self._close(key))
+        self._pool.start(lambda: self._close(key, forget_password=True))
 
     def shutdown(self) -> None:
         self.generation += 1
@@ -369,21 +366,26 @@ class RenderService(QObject):
             old.close()
         return doc
 
-    def _close(self, key: str) -> None:
+    def _close(self, key: str, forget_password: bool = False) -> None:
+        if forget_password:
+            self._passwords.pop(key, None)
         doc = self._docs.pop(key, None)
         if doc is not None:
             doc.close()
 
-    def _do_probe(self, job_id: int, key: str) -> None:
+    def _do_probe(self, job_id: int, key: str, password: Optional[str] = None) -> None:
         import pymupdf
 
         try:
+            if password:  # all state below belongs to this worker thread
+                self._passwords[key] = password
+                self._close(key)  # reopen with the password
             doc = self._open(key)
             if doc.is_encrypted:  # needs_pass stays true even after authenticate()
                 self.probed.emit(job_id, ProbeResult(ok=True, locked=True))
                 return
             if doc.page_count == 0:
-                self.probed.emit(job_id, ProbeResult(ok=False, error="這份 PDF 沒有任何頁面"))
+                self.probed.emit(job_id, ProbeResult(ok=False, error=tr("這份 PDF 沒有任何頁面")))
                 return
             page = doc.load_page(0)
             rect = page.rect
@@ -396,7 +398,7 @@ class RenderService(QObject):
             )
         except Exception as exc:
             self._docs.pop(key, None)
-            self.probed.emit(job_id, ProbeResult(ok=False, error=f"無法讀取 PDF：{exc}"))
+            self.probed.emit(job_id, ProbeResult(ok=False, error=tr("無法讀取 PDF：{error}", error=exc)))
 
     def _do_render(self, key: str, page_no: int, width_px: int, generation: int) -> None:
         import pymupdf
@@ -416,4 +418,4 @@ class RenderService(QObject):
             image = _to_qimage(page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False))
             self.rendered.emit(key, page_no, generation, image)
         except Exception:
-            traceback.print_exc()
+            errorlog.log_exception()

@@ -38,6 +38,7 @@ AI 版面分析會自動辨識標題層級、清單、表格、圖片與閱讀�
 | 受密碼保護的 PDF | 在檔案上點兩下，或開始轉換時輸入密碼 |
 | 預覽 | 原始 PDF（延遲渲染，大檔案也流暢）、渲染後的 Markdown、語法上色的原始碼 |
 | 介面 | 淺色／深色／跟隨系統主題（Windows 標題列也會跟著變色）、通知提示、拖放提示、右鍵選單 |
+| 介面語言 | 繁體中文／English。預設跟隨 Windows 顯示語言（中文 Windows 顯示繁中，其他語言顯示英文），右上角地球圖示可手動切換，重新啟動後套用 |
 
 ## 快捷鍵
 
@@ -83,9 +84,11 @@ qpdf2mk/
   icons.py                  SVG 線條圖示（隨主題換色）
   brand.py                  SAISAI 標誌（向量繪製，深色主題自動反白）
   legal.py                  授權全文與第三方授權聲明（打包時依實際安裝的套件自動產生）
+  i18n/                     介面語系：tr() 翻譯函式與英文字典 en.py
   main_window.py            主視窗：串接整個操作流程
   widgets/                  自訂元件：分段選擇器、開關、步驟列、檔案卡片、預覽、通知…
 tests/test_engine.py        轉換核心的單元測試
+tests/test_i18n.py          語系檢查：所有中文字串都有英文翻譯、佔位符一致
 ```
 
 ## 開發
@@ -103,6 +106,25 @@ print(result.output_path, result.pages, result.words, result.ocr_pages)
 ```
 
 OCR 測試需要安裝 `rapidocr`（已列在 `requirements.txt`）；沒有安裝時會自動略過。
+
+### 介面語系
+
+程式碼中的繁體中文字串就是翻譯的 key，顯示前一律經過 `qpdf2mk/i18n` 的 `tr()`；其他語言的對照表放在 `qpdf2mk/i18n/<語言>.py`（目前只有 `en.py`）。
+
+```python
+from qpdf2mk.i18n import tr
+tr("已加入 {n} 個檔案", n=3)            # 具名佔位符，str.format 語法；不可用 f-string
+tr("關閉", context="ocr")                # 同一中文在不同位置意思不同時加 context，en.py 的 key 寫成 "ocr|關閉"
+```
+
+```python
+# en.py
+"已加入 {n} 個檔案": ("Added {n} file", "Added {n} files"),   # tuple = (單數, 複數)，依 n 選擇
+```
+
+- 新增或修改介面文字後，到 `en.py` 補上翻譯；`tests/test_i18n.py` 會掃描原始碼，漏翻、佔位符不一致、殘留沒用到的翻譯都會讓測試失敗。
+- 語言在啟動時決定（QSettings 的 `language`：`system`／`zh_TW`／`en`），切換後要重新啟動才會套用。
+- 新增語言：建立 `<代碼>.py`、在 `i18n/__init__.py` 的 `LANGUAGES`、`_catalog()`、`match_language()`、`qt_locale_name()` 加上該語言，並在 `packaging/msix/AppxManifest.xml.in` 的 `<Resources>` 加一行。
 
 ## 打包成 exe
 

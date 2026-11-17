@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import icons, theme
+from ..i18n import sep, tr
 from ..jobs import Job, RenderService, Status, human_size
 from .controls import ProgressRing, SegmentedControl
 
@@ -103,7 +104,7 @@ class _PageWidget(QWidget):
         else:
             painter.setPen(QColor("#B4BAC6"))
             painter.setFont(theme.ui_font(11, QFont.Weight.DemiBold))
-            painter.drawText(page, Qt.AlignmentFlag.AlignCenter, f"第 {self.index + 1} 頁")
+            painter.drawText(page, Qt.AlignmentFlag.AlignCenter, tr("第 {page} 頁", page=self.index + 1))
 
 
 class PdfPagesView(QScrollArea):
@@ -231,7 +232,7 @@ def _front_matter_as_table(md: str) -> str:
         if ":" in line:
             k, v = line.split(":", 1)
             rows.append(f"| {k.strip()} | {v.strip().strip(chr(34))} |")
-    table = "| 屬性 | 值 |\n|---|---|\n" + "\n".join(rows) + "\n\n"
+    table = f"| {tr('屬性')} | {tr('值')} |\n|---|---|\n" + "\n".join(rows) + "\n\n"
     return table + md[m.end():]
 
 
@@ -541,7 +542,8 @@ class SourceView(QPlainTextEdit):
 
     def set_markdown(self, md: str) -> None:
         # Keep huge base64 payloads from turning the source view into a wall of noise.
-        shown = _DATA_URI.sub(lambda m: f"{m.group(1)}…（{len(m.group(2)) * 3 // 4 // 1024 + 1} KB 內嵌圖片）", md)
+        shown = _DATA_URI.sub(
+            lambda m: m.group(1) + "…" + tr("（{kb} KB 內嵌圖片）", kb=len(m.group(2)) * 3 // 4 // 1024 + 1), md)
         self.setPlainText(shown)
 
     def refresh_theme(self) -> None:
@@ -662,7 +664,7 @@ class StatChip(QFrame):
 class PreviewPanel(QFrame):
     actionRequested = Signal(str, int)  # action, job id
 
-    TABS = [("pdf", "原始 PDF", "file"), ("rendered", "預覽", "eye"), ("source", "Markdown", "code")]
+    TABS = [("pdf", "原始 PDF", "file"), ("rendered", "預覽", "eye"), ("source", "Markdown", "code")]  # labels: message keys
 
     def __init__(self, renderer: RenderService, parent=None):
         super().__init__(parent)
@@ -681,14 +683,14 @@ class PreviewPanel(QFrame):
         self._header = header
         title_col = QVBoxLayout()
         title_col.setSpacing(1)
-        self.title = QLabel("預覽", objectName="PanelTitle")
+        self.title = QLabel(tr("預覽"), objectName="PanelTitle")
         self.subtitle = QLabel("", objectName="Faint")
         for label in (self.title, self.subtitle):
             label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             label.setMinimumWidth(60)
             title_col.addWidget(label)
         header.addLayout(title_col, 1)
-        self.tabs = SegmentedControl(self.TABS)
+        self.tabs = SegmentedControl([(key, tr(label), icon) for key, label, icon in self.TABS])
         self.tabs.setFixedWidth(self.tabs.full_width() + 12)
         self.tabs.changed.connect(self._on_tab)
         header.addWidget(self.tabs, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -701,7 +703,7 @@ class PreviewPanel(QFrame):
             ("save_as", "download", "另存新檔…"),
         ):
             btn = QToolButton()
-            btn.setToolTip(tip)
+            btn.setToolTip(tr(tip))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             icons.binder.bind(btn, icon_name)
             btn.clicked.connect(lambda _=False, k=key: self._emit(k))
@@ -744,7 +746,7 @@ class PreviewPanel(QFrame):
         layout.addWidget(self._footer_divider)
         layout.addWidget(self.footer)
 
-        self.empty.show_state("尚未選擇檔案", "從左側佇列選擇一個 PDF，即可在這裡預覽原稿與轉換結果。", icon="eye")
+        self.empty.show_state(tr("尚未選擇檔案"), tr("從左側佇列選擇一個 PDF，即可在這裡預覽原稿與轉換結果。"), icon="eye")
         self.set_job(None)
 
     # ---- public API
@@ -803,7 +805,7 @@ class PreviewPanel(QFrame):
         self._sync()
 
     def _on_page_changed(self, cur: int, total: int) -> None:
-        self._page_info = f"第 {cur} / {total} 頁"
+        self._page_info = tr("第 {page} / {total} 頁", page=cur, total=total)
         if self.tabs.value() == "pdf":
             self._update_subtitle()
 
@@ -821,7 +823,7 @@ class PreviewPanel(QFrame):
             return
         tab = self.tabs.value()
         if tab == "pdf" and job.page_count:
-            text = f"{self._page_info or f'共 {job.page_count} 頁'}　·　{human_size(job.size)}"
+            text = (self._page_info or tr("共 {n} 頁", n=job.page_count)) + sep() + human_size(job.size)
         elif job.result is not None and job.status == Status.DONE:
             text = str(job.result.output_path.parent)
         else:
@@ -836,7 +838,7 @@ class PreviewPanel(QFrame):
         self.tabs.setEnabled(job is not None)
 
         if job is None:
-            self._set_elided(self.title, "預覽")
+            self._set_elided(self.title, tr("預覽"))
             self._set_elided(self.subtitle, "")
             self.stack.setCurrentWidget(self.empty)
             self.pdf.clear()
@@ -849,20 +851,20 @@ class PreviewPanel(QFrame):
 
         if job.status == Status.LOCKED:
             self.stack.setCurrentWidget(self.state)
-            self.state.show_state("此 PDF 受密碼保護", "輸入開啟密碼後即可預覽並轉換這份文件。", icon="lock", role="warning",
-                                  button="輸入密碼", action="unlock", primary=True)
+            self.state.show_state(tr("此 PDF 受密碼保護"), tr("輸入開啟密碼後即可預覽並轉換這份文件。"), icon="lock",
+                                  role="warning", button=tr("輸入密碼"), action="unlock", primary=True)
         elif tab == "pdf":
             if job.page_count:
                 self.pdf.set_document(job.path, job.page_count, job.page_size)
                 self.stack.setCurrentWidget(self.pdf)
             elif job.status == Status.FAILED and not job.probed:
                 self.stack.setCurrentWidget(self.state)
-                self.state.show_state("無法讀取此檔案", job.error, icon="alert", role="danger")
+                self.state.show_state(tr("無法讀取此檔案"), job.error, icon="alert", role="danger")
             else:
                 self.stack.setCurrentWidget(self.state)
-                self.state.show_state("正在讀取 PDF…", "", icon="file-text")
+                self.state.show_state(tr("正在讀取 PDF…"), "", icon="file-text")
         elif done:
-            md = job.result.markdown
+            md = job.result.load_markdown()
             key = (job.id, id(md))
             view = self.rendered if tab == "rendered" else self.source
             if self._loaded.get(tab) != key:
@@ -880,17 +882,18 @@ class PreviewPanel(QFrame):
     def _show_job_state(self, job: Job) -> None:
         s = job.status
         if s == Status.RUNNING:
-            self.state.show_state("正在轉換", job.message or "準備中…", progress=job.progress)
+            self.state.show_state(tr("正在轉換"), job.message or tr("準備中…"), progress=job.progress)
         elif s == Status.QUEUED:
-            self.state.show_state("排隊中", "前面的檔案轉換完成後就會輪到這份文件。", icon="clock")
+            self.state.show_state(tr("排隊中"), tr("前面的檔案轉換完成後就會輪到這份文件。"), icon="clock")
         elif s == Status.FAILED:
-            self.state.show_state("轉換失敗", job.error, icon="alert", role="danger", button="重試", action="retry", primary=True)
+            self.state.show_state(tr("轉換失敗"), job.error, icon="alert", role="danger", button=tr("重試"), action="retry",
+                                  primary=True)
         elif s == Status.CANCELLED:
-            self.state.show_state("轉換已取消", "可以隨時重新開始轉換這份文件。", icon="info", role="warning",
-                                  button="重新轉換", action="convert", primary=True)
+            self.state.show_state(tr("轉換已取消"), tr("可以隨時重新開始轉換這份文件。"), icon="info", role="warning",
+                                  button=tr("重新轉換"), action="convert", primary=True)
         else:
-            self.state.show_state("尚未轉換", "調整右側的轉換設定後，按下「開始轉換」，結果會立刻顯示在這裡。",
-                                  icon="markdown", button="只轉換這個檔案", action="convert", primary=True)
+            self.state.show_state(tr("尚未轉換"), tr("調整右側的轉換設定後，按下「開始轉換」，結果會立刻顯示在這裡。"),
+                                  icon="markdown", button=tr("只轉換這個檔案"), action="convert", primary=True)
 
     def _set_footer(self, result) -> None:
         visible = result is not None
@@ -898,12 +901,12 @@ class PreviewPanel(QFrame):
         self._footer_divider.setVisible(visible)
         if not visible:
             return
-        self.chips["pages"].set_text(f"{result.pages} 頁")
-        self.chips["words"].set_text(f"{result.words:,} 字")
-        self.chips["images"].set_text(f"{result.images} 張圖片")
-        self.chips["time"].set_text(f"{result.elapsed:.1f} 秒")
-        mode = "AI 版面分析" if result.mode == "layout" else "快速模式"
-        self.chips["mode"].set_text(f"{mode} · OCR {result.ocr_pages} 頁" if result.ocr_pages else mode)
+        self.chips["pages"].set_text(tr("{n} 頁", n=result.pages))
+        self.chips["words"].set_text(tr("{n:,} 字", n=result.words))
+        self.chips["images"].set_text(tr("{n} 張圖片", n=result.images))
+        self.chips["time"].set_text(tr("{seconds:.1f} 秒", seconds=result.elapsed))
+        mode = tr("AI 版面分析") if result.mode == "layout" else tr("快速模式")
+        self.chips["mode"].set_text(f"{mode} · {tr('OCR {n} 頁', n=result.ocr_pages)}" if result.ocr_pages else mode)
         self.out_label.setText(result.output_path.name)
         self.out_label.setToolTip(str(result.output_path))
 

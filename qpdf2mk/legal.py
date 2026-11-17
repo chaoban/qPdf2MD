@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from . import APP_NAME, APP_VERSION, CONTACT_EMAIL, COPYRIGHT, LICENSE_SPDX, PUBLISHER, SOURCE_URL
+from .i18n import tr
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTICES_NAME = "THIRD_PARTY_NOTICES.txt"
@@ -56,7 +57,7 @@ def license_text(file_name: str) -> str:
     try:
         return path.read_text(encoding="utf-8")
     except OSError:
-        return f"找不到授權檔 {file_name}。完整條款請見 https://www.gnu.org/licenses/"
+        return tr("找不到授權檔 {name}。完整條款請見 https://www.gnu.org/licenses/", name=file_name)
 
 
 def third_party_notices() -> str:

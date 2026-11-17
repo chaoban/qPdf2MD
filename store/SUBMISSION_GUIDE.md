@@ -65,7 +65,7 @@ qPdf2MD 內含 PyMuPDF、pymupdf4llm、PyMuPDF Layout（AGPL-3.0），所以整�
 
 | 欄位 | 建議填法 | 說明 |
 |---|---|---|
-| 市場（Markets） | **台灣、香港、澳門**；可加新加坡、馬來西亞 | 介面只有繁體中文。免費 App 開放全部市場也可以，但看不懂中文的使用者容易下載後給低評價；要全開的話，請一併新增英文商店清單（3.5 節最後），描述開頭寫明介面為繁體中文 |
+| 市場（Markets） | **全部市場** | 介面有繁體中文與英文（依 Windows 顯示語言自動選擇），非中文地區的使用者會看到英文介面。開放全部市場時，請一併新增英文商店清單（3.5 節最後） |
 | 對象（Audience） | 公開（Public audience） | |
 | 可探索性（Discoverability） | 在 Microsoft Store 中提供並可搜尋到 | |
 | 排程（Schedule） | 通過認證後立即發行 | 想自己決定上架時間，改在 3.6「發行保留選項」設定 |
@@ -127,7 +127,7 @@ qPdf2MD 內含 PyMuPDF、pymupdf4llm、PyMuPDF Layout（AGPL-3.0），所以整�
 ### 3.4 套件（Packages）
 
 1. 把 `%USERPROFILE%\.qpdf2mk\msix\qPdf2MD_1.0.0.0_x64.msix` 拖進上傳區。
-2. 驗證完成後確認：版本 `1.0.0.0`、架構 `x64`、語言 `zh-TW`。
+2. 驗證完成後確認：版本 `1.0.0.0`、架構 `x64`、語言 `zh-TW`、`en-US`（來自 AppxManifest 的 `<Resources>`，對應程式的繁中／英文介面）。
 3. 裝置系列（Device family availability）：只勾 **Windows 10/11 桌上型電腦**，Xbox、HoloLens 等不勾。
 
 上傳時可能出現的訊息：
@@ -138,7 +138,7 @@ qPdf2MD 內含 PyMuPDF、pymupdf4llm、PyMuPDF Layout（AGPL-3.0），所以整�
 
 ### 3.5 商店清單（Store listings）
 
-「新增語言」→ 選 **中文（台灣）**。下列文字可直接複製；英文清單為選填，放在本節最後。
+「新增語言」→ 選 **中文（台灣）** 與 **English (United States)**。下列文字可直接複製；英文清單放在本節最後。
 
 **產品名稱（Product name）**：`qPdf2MD`（從保留名稱選）。政策 10.1.1 規定名稱不可夾帶說明文字，所以不要寫成「qPdf2MD – PDF 轉 Markdown」。
 
@@ -161,9 +161,10 @@ AI 版面分析會自動辨識標題層級、段落、清單、表格、圖片�
 • 即時預覽：原始 PDF、排版後的 Markdown、語法上色的原始碼，三種檢視切換對照
 • 支援受密碼保護的 PDF
 • 淺色、深色與跟隨系統主題
+• 繁體中文與英文介面，預設跟隨 Windows 顯示語言，可在右上角切換
 
 使用須知
-• 介面語言為繁體中文。
+• 介面語言：繁體中文、英文。
 • 需要 Windows 10 版本 1809 以上（64 位元）。
 • OCR 準確度取決於掃描品質；字太小、模糊或歪斜的頁面可能出現錯字，重要文件請對照原稿校對。
 • 本程式只讀取 PDF、產生 Markdown，不會修改原始 PDF。
@@ -187,6 +188,7 @@ AI 版面分析，辨識標題、清單、表格與閱讀順序
 原始 PDF、Markdown 預覽與原始碼三種檢視
 支援受密碼保護的 PDF
 淺色／深色主題
+繁體中文與英文介面
 ```
 
 **螢幕擷取畫面（Screenshots）**：至少 1 張，建議 4–6 張；PNG、單檔 ≤50 MB、**1366×768 以上**（建議 1920×1080），最多 10 張。畫面必須是程式實際的樣子（政策 10.1）。建議內容：
@@ -247,12 +249,12 @@ Third-party components are used under their own licenses; see "About > License i
 
 **其他系統需求**：與 3.2 相同，可再寫一次。
 
-#### 英文清單（選填）
+#### 英文清單
 
-想讓非中文區使用者也看得懂，可再「新增語言 → English (United States)」。描述開頭要先說明介面是繁體中文，避免政策 10.7 的語言一致性問題：
+程式已有英文介面（英文 Windows 預設顯示英文），英文商店頁與實際畫面一致，不再需要特別註明介面語言。截圖請用英文介面拍攝（右上角地球圖示 → English → 重新啟動）：
 
 ```
-qPdf2MD converts PDF files into clean, structured Markdown. Note: the user interface is in Traditional Chinese.
+qPdf2MD converts PDF files into clean, structured Markdown, with an English and Traditional Chinese interface.
 
 AI layout analysis detects headings, lists, tables, images and reading order, and skips page headers, footers and page numbers. Scanned PDFs are supported through built-in OCR for Traditional Chinese, Simplified Chinese, English and Japanese.
 
@@ -264,6 +266,7 @@ Everything runs offline on your PC. No account, no uploads.
 • Page ranges, image export (files, embedded Base64 or none), automatic clean-up
 • Side-by-side preview: original PDF, rendered Markdown and source
 • Password-protected PDFs, light and dark themes
+• English and Traditional Chinese interface (follows the Windows display language; switchable)
 
 Requires Windows 10 version 1809 or later (64-bit). OCR accuracy depends on scan quality.
 
@@ -277,17 +280,17 @@ qPdf2MD is free software licensed under the GNU AGPL v3; see the additional lice
 **認證備註（Notes for certification，≤2,000 字元）**，可直接複製：
 
 ```
-qPdf2MD is an offline desktop app (Python + Qt, packaged with PyInstaller as a full-trust MSIX) that converts PDF files to Markdown. The user interface is in Traditional Chinese.
+qPdf2MD is an offline desktop app (Python + Qt, packaged with PyInstaller as a full-trust MSIX) that converts PDF files to Markdown. The user interface is in English or Traditional Chinese, following the Windows display language; the globe button at the top right switches it (applied after a restart).
 
 No account, login, network connection or special hardware is required. Any PDF file can be used for testing.
 
 How to test:
 1. Start qPdf2MD from the Start menu.
-2. Drag one or more PDF files (or a folder) onto the window, or press Ctrl+O (button「選擇 PDF 檔案」).
-3. Press「開始轉換」(Ctrl+Enter). Progress is shown per page. The .md file is written next to the PDF by default (or to the folder chosen in the right-hand settings panel).
+2. Drag one or more PDF files (or a folder) onto the window, or press Ctrl+O (button "Choose PDF files").
+3. Press "Start conversion" (Ctrl+Enter). Progress is shown per page. The .md file is written next to the PDF by default (or to the folder chosen in the right-hand settings panel).
 4. When finished, the preview switches to the rendered Markdown. Ctrl+1 / Ctrl+2 / Ctrl+3 switch between the original PDF, the preview and the Markdown source.
 5. For a scanned PDF (image-only pages), OCR runs automatically.
-6. F1 opens the About box; 「授權資訊…」shows the open-source licenses.
+6. F1 opens the About box; "Licenses…" shows the open-source licenses.
 
 The first conversion may take a few seconds while the AI layout and OCR models load. All models are included in the package; the app never downloads code or data.
 

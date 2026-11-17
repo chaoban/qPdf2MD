@@ -7,10 +7,12 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+from collections import deque
 from pathlib import Path
 from typing import Iterable, Optional
 
-from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
+from PySide6.QtCore import QProcess, QSettings, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -28,8 +30,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from . import APP_NAME, COPYRIGHT, LICENSE_NAME, brand, icons, theme
+from . import APP_NAME, COPYRIGHT, LICENSE_NAME, brand, i18n, icons, theme
 from .engine import ConvertResult, EngineInfo, images_dir_for
+from .i18n import sep, tr
 from .jobs import ConversionQueue, Job, JobListModel, ProbeResult, RenderService, Status
 from .theme import ThemeManager
 from .widgets.controls import ThinProgress
@@ -44,6 +47,7 @@ MAX_SCAN = 2000
 # Fits 1920x1080 at 150 % and 1366x768 at 125 % scaling. Width = panel minimums (240 + 440 + 320) plus margins and
 # splitter handles, which also leaves the header stepper its full width; the start page scrolls when the window is shorter.
 MIN_WINDOW = (1056, 560)
+KEEP_RESULTS = 3  # finished conversions whose Markdown stays in memory; older ones are re-read from disk on demand
 
 
 def collect_pdfs(paths: Iterable[str | Path]) -> tuple[list[Path], bool]:
@@ -76,7 +80,22 @@ def reveal_in_explorer(path: Path) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.parent)))
 
 
+def relaunch() -> bool:
+    """Start a fresh copy of the program (used to apply a new UI language)."""
+    if getattr(sys, "frozen", False):
+        # qPdf2MD.exe, also inside the MSIX package: a packaged app may start its own executables,
+        # and the new process keeps the package identity.
+        program, args = sys.executable, []
+        # Tell the PyInstaller bootloader that the child is a new top-level instance, not a helper of this one.
+        os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    else:
+        program, args = sys.executable, [str(Path(sys.argv[0]).resolve())]
+    return bool(QProcess.startDetached(program, args, str(Path.home())))
+
+
 class MainWindow(QMainWindow):
+    _scanned = Signal(object, bool)  # (pdf paths, had_folder) from the folder-scan thread
+
     def __init__(self, theme_manager: ThemeManager, settings: QSettings):
         super().__init__()
         self.tm = theme_manager
@@ -87,8 +106,11 @@ class MainWindow(QMainWindow):
         self._batch_done = 0
         self._last_output: Optional[Path] = None
         self._stopping = False
+        self._restart = False
+        self._recent: deque[int] = deque(maxlen=KEEP_RESULTS)
+        self._scanned.connect(self._add_pdfs)
 
-        self.setWindowTitle(f"{APP_NAME} — PDF 轉 Markdown")
+        self.setWindowTitle(self._idle_title())
         self.setWindowIcon(icons.app_icon())
         self.setMinimumSize(*MIN_WINDOW)
         self.setAcceptDrops(True)
@@ -156,11 +178,11 @@ class MainWindow(QMainWindow):
         outer = QVBoxLayout(page)
         outer.setContentsMargins(40, 20, 40, 36)
         outer.addStretch(2)
-        title = QLabel("把 PDF 變成乾淨、結構化的 Markdown", objectName="HeroTitle")
+        title = QLabel(tr("把 PDF 變成乾淨、結構化的 Markdown"), objectName="HeroTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(title)
         outer.addSpacing(8)
-        sub = QLabel("AI 版面分析自動辨識標題、清單、表格與圖片，完整保留文件結構——適合筆記、技術文件與 AI 知識庫。",
+        sub = QLabel(tr("AI 版面分析自動辨識標題、清單、表格與圖片，完整保留文件結構——適合筆記、技術文件與 AI 知識庫。"),
                      objectName="HeroSubtitle")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sub.setWordWrap(True)
@@ -192,15 +214,15 @@ class MainWindow(QMainWindow):
             self._feature_icons.append((ico, icon_name))
             cl.addWidget(ico)
             cl.addSpacing(4)
-            cl.addWidget(QLabel(head, objectName="FieldLabel"))
-            t = QLabel(text, objectName="Hint")
+            cl.addWidget(QLabel(tr(head), objectName="FieldLabel"))
+            t = QLabel(tr(text), objectName="Hint")
             t.setWordWrap(True)
             cl.addWidget(t)
             features.addWidget(card)
         features.addStretch(1)
         outer.addLayout(features)
         outer.addSpacing(22)
-        keys = QLabel("Ctrl + O 開啟檔案　·　支援一次拖放多個 PDF 或整個資料夾", objectName="Faint")
+        keys = QLabel(tr("Ctrl + O 開啟檔案") + sep() + tr("支援一次拖放多個 PDF 或整個資料夾"), objectName="Faint")
         keys.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(keys)
         outer.addStretch(3)
@@ -208,8 +230,8 @@ class MainWindow(QMainWindow):
         footer.setSpacing(10)
         footer.addStretch(1)
         footer.addWidget(brand.Logo(14), 0, Qt.AlignmentFlag.AlignVCenter)
-        footer.addWidget(QLabel(f"{COPYRIGHT}　·　依 {LICENSE_NAME} 授權發布　·　F1 關於與授權資訊", objectName="Faint"),
-                         0, Qt.AlignmentFlag.AlignVCenter)
+        notice = sep().join((COPYRIGHT, tr("依 {license} 授權發布", license=LICENSE_NAME), tr("F1 關於與授權資訊")))
+        footer.addWidget(QLabel(notice, objectName="Faint"), 0, Qt.AlignmentFlag.AlignVCenter)
         footer.addStretch(1)
         outer.addLayout(footer)
         return page
@@ -232,6 +254,7 @@ class MainWindow(QMainWindow):
 
         self.header.themeClicked.connect(self._cycle_theme)
         self.header.aboutClicked.connect(self._show_about)
+        self.header.languageChosen.connect(self._choose_language)
 
         self.queue.jobStarted.connect(self._on_job_started)
         self.queue.jobProgress.connect(self._on_job_progress)
@@ -267,6 +290,7 @@ class MainWindow(QMainWindow):
             self.resize(min(1460, int(screen.width() * 0.9)), min(900, int(screen.height() * 0.9)))
             w, h = self.width(), self.height()  # the minimum size wins on very small screens
             self.move(max(screen.left(), screen.center().x() - w // 2), max(screen.top(), screen.center().y() - h // 2))
+        self.header.set_language_pref(str(self.store.value(i18n.SETTING_KEY, i18n.SYSTEM)))
         split = self.store.value("splitter")
         if split is not None:
             self.splitter.restoreState(split)
@@ -304,29 +328,49 @@ class MainWindow(QMainWindow):
     def _cycle_theme(self) -> None:
         mode = self.tm.cycle()
         self.store.setValue("theme", mode)
-        self.toasts.show("info", f"已切換為「{THEME_META[mode][1]}」主題", duration=1800)
+        self.toasts.show("info", tr("已切換為「{theme}」主題", theme=tr(THEME_META[mode][1])), duration=1800)
+
+    def _choose_language(self, pref: str) -> None:
+        if pref == str(self.store.value(i18n.SETTING_KEY, i18n.SYSTEM)):
+            return
+        self.store.setValue(i18n.SETTING_KEY, pref)
+        self.header.set_language_pref(pref)
+        target = i18n.resolve(pref)
+        if target == i18n.current():
+            return  # e.g. "follow Windows" while Windows already uses the language on screen
+        self.toasts.show("info", tr("重新啟動 {app} 後將切換為 {language}", app=APP_NAME, language=i18n.LANGUAGES[target]),
+                         tr("立即重新啟動"), self.restart, duration=8000)
+
+    def restart(self) -> None:
+        """Close (asking first while a conversion runs) and start again, e.g. to apply a new UI language."""
+        self._restart = True
+        self.close()
+
+    def _idle_title(self) -> str:
+        return f"{APP_NAME} — {tr('PDF 轉 Markdown')}"
 
     def set_engine_loading(self) -> None:
-        self.header.engine.set_state("warning", "引擎載入中", pulsing=True, tooltip="正在載入 PDF 解析與 AI 版面分析模型…")
+        self.header.engine.set_state("warning", tr("引擎載入中"), pulsing=True, tooltip=tr("正在載入 PDF 解析與 AI 版面分析模型…"))
 
     def set_engine_ready(self, info: EngineInfo) -> None:
         self._engine_info = info
-        layout = "AI 版面分析可用" if info.layout_available else "AI 版面分析不可用，使用快速模式"
-        ocr = "OCR 文字辨識可用（RapidOCR）" if info.ocr_available else "OCR 文字辨識不可用"
-        self.header.engine.set_state("success", "引擎就緒", tooltip=f"pymupdf4llm {info.version}\n{layout}\n{ocr}")
+        layout = tr("AI 版面分析可用") if info.layout_available else tr("AI 版面分析不可用，使用快速模式")
+        ocr = tr("OCR 文字辨識可用（RapidOCR）") if info.ocr_available else tr("OCR 文字辨識不可用")
+        self.header.engine.set_state("success", tr("引擎就緒"), tooltip=f"pymupdf4llm {info.version}\n{layout}\n{ocr}")
         self.options.set_engine_info(info.layout_available, info.ocr_available)
 
     def set_engine_failed(self, message: str) -> None:
         self._engine_error = message
-        self.header.engine.set_state("danger", "引擎錯誤", tooltip=message)
-        self.toasts.show("error", f"轉換引擎載入失敗：{message}", duration=0)
+        self.header.engine.set_state("danger", tr("引擎錯誤"), tooltip=message)
+        self.toasts.show("error", tr("轉換引擎載入失敗：{error}", error=message), duration=0)
 
     def _engine_text(self) -> str:
         if self._engine_info:
-            enabled = [name for name, ok in (("AI 版面分析", self._engine_info.layout_available),
-                                             ("OCR 文字辨識", self._engine_info.ocr_available)) if ok]
-            return f"轉換引擎 pymupdf4llm {self._engine_info.version}" + (f"（{'、'.join(enabled)}已啟用）" if enabled else "")
-        return self._engine_error or "轉換引擎載入中…"
+            enabled = [tr(name) for name, ok in (("AI 版面分析", self._engine_info.layout_available),
+                                                 ("OCR 文字辨識", self._engine_info.ocr_available)) if ok]
+            text = tr("轉換引擎 pymupdf4llm {version}", version=self._engine_info.version)
+            return text + (tr("（{features}已啟用）", features=tr("、").join(enabled)) if enabled else "")
+        return self._engine_error or tr("轉換引擎載入中…")
 
     def _show_about(self) -> None:
         AboutDialog(self, self._engine_text()).exec()
@@ -334,15 +378,23 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ adding & removing
     def open_files_dialog(self) -> None:
         start = self.store.value("last_dir", str(Path.home() / "Documents"))
-        files, _ = QFileDialog.getOpenFileNames(self, "選擇要轉換的 PDF 檔案", start, "PDF 文件 (*.pdf);;所有檔案 (*)")
+        files, _ = QFileDialog.getOpenFileNames(self, tr("選擇要轉換的 PDF 檔案"), start,
+                                                f"{tr('PDF 文件')} (*.pdf);;{tr('所有檔案')} (*)")
         if files:
             self.store.setValue("last_dir", str(Path(files[0]).parent))
             self.add_paths(files)
 
     def add_paths(self, paths: Iterable[str | Path]) -> None:
-        pdfs, had_folder = collect_pdfs(paths)
+        paths = [Path(p) for p in paths]
+        if any(p.is_dir() for p in paths):
+            # Walking a big folder tree must not freeze the window.
+            threading.Thread(target=lambda: self._scanned.emit(*collect_pdfs(paths)), daemon=True).start()
+        else:
+            self._add_pdfs(*collect_pdfs(paths))
+
+    def _add_pdfs(self, pdfs: list[Path], had_folder: bool) -> None:
         if not pdfs:
-            self.toasts.show("warning", "資料夾中沒有找到 PDF 檔案" if had_folder else "只支援 PDF 檔案")
+            self.toasts.show("warning", tr("資料夾中沒有找到 PDF 檔案") if had_folder else tr("只支援 PDF 檔案"))
             return
         added: list[Job] = []
         dup = 0
@@ -361,9 +413,9 @@ class MainWindow(QMainWindow):
         if added:
             self._select(added[0].id)
         if len(added) > 1 or dup:
-            msg = f"已加入 {len(added)} 個檔案" if added else "這些檔案已經在清單中"
+            msg = tr("已加入 {n} 個檔案", n=len(added)) if added else tr("這些檔案已經在清單中")
             if added and dup:
-                msg += f"，略過 {dup} 個重複的檔案"
+                msg += tr("，略過 {n} 個重複的檔案", n=dup)
             self.toasts.show("success" if added else "info", msg, duration=2600)
         elif len(added) == 1 and len(self.model.jobs) == 1:
             pass  # the first file: the screen change is feedback enough
@@ -391,7 +443,7 @@ class MainWindow(QMainWindow):
         for i in ids:
             self.remove_job(i)
         if ids:
-            self.toasts.show("info", f"已清除 {len(ids)} 個已完成的檔案", duration=2200)
+            self.toasts.show("info", tr("已清除 {n} 個已完成的檔案", n=len(ids)), duration=2200)
 
     def clear_all(self) -> None:
         for j in self.model.jobs:
@@ -475,7 +527,7 @@ class MainWindow(QMainWindow):
                 continue
         todo = [j for j in todo if j.status != Status.LOCKED and not (j.status == Status.FAILED and not j.page_count and j.probed and not j.encrypted)]
         if not todo:
-            self.toasts.show("warning", "沒有可以轉換的檔案")
+            self.toasts.show("warning", tr("沒有可以轉換的檔案"))
             return
         for job in todo:
             job.status = Status.QUEUED
@@ -500,7 +552,7 @@ class MainWindow(QMainWindow):
             if job:
                 job.status = Status.CANCELLED
                 self._refresh_job(job)
-        self.options.start_btn.setText("  正在停止…")
+        self.options.start_btn.setText("  " + tr("正在停止…"))
         self.options.start_btn.setEnabled(False)
 
     def _refresh_job(self, job: Job) -> None:
@@ -513,7 +565,7 @@ class MainWindow(QMainWindow):
             return
         job.status = Status.RUNNING
         job.progress = 0.0
-        job.message = "準備中…"
+        job.message = tr("準備中…")
         if self.preview.job is None:
             self._select(job_id)
         self._refresh_job(job)
@@ -528,7 +580,7 @@ class MainWindow(QMainWindow):
         self._refresh_job(job)
         overall = (self._batch_done + fraction) / max(self._batch_total, 1)
         self.batch_bar.set_value(overall)
-        self.setWindowTitle(f"{APP_NAME} — 轉換中 {round(overall * 100)}%")
+        self.setWindowTitle(f"{APP_NAME} — {tr('轉換中 {pct}%', pct=round(overall * 100))}")
 
     def _on_job_finished(self, job_id: int, result: ConvertResult) -> None:
         self._batch_done += 1
@@ -542,7 +594,16 @@ class MainWindow(QMainWindow):
         job.progress = 1.0
         self._refresh_job(job)
         self.preview.show_result_of(job)
+        self._release_old_results(job_id)
         self._update_ui()
+
+    def _release_old_results(self, finished_id: int) -> None:
+        """Keep the Markdown of the latest results and the open preview only, so large batches stay small in memory."""
+        self._recent.append(finished_id)
+        shown = self.preview.job.id if self.preview.job is not None else None
+        for j in self.model.jobs:
+            if j.result is not None and j.id != shown and j.id not in self._recent:
+                j.result.release()
 
     def _on_job_failed(self, job_id: int, message: str, is_password: bool) -> None:
         self._batch_done += 1
@@ -572,30 +633,33 @@ class MainWindow(QMainWindow):
         self.options.set_running(False)
         self.batch_bar.set_value(1.0)
         self.batch_bar.set_active(False)
-        self.setWindowTitle(f"{APP_NAME} — PDF 轉 Markdown")
+        self.setWindowTitle(self._idle_title())
         self._update_ui()
         if not self.isActiveWindow():
             QApplication.alert(self)
         last = self._last_output
         if cancelled and not done:
-            self.toasts.show("info", "已停止轉換")
+            self.toasts.show("info", tr("已停止轉換"))
         elif cancelled and last is not None:
-            self.toasts.show("info", f"已停止轉換，完成的 {done} 個檔案已儲存", "開啟資料夾",
+            self.toasts.show("info", tr("已停止轉換，完成的 {n} 個檔案已儲存", n=done), tr("開啟資料夾"),
                              lambda p=last: reveal_in_explorer(p), duration=6000)
         elif failed and done:
-            self.toasts.show("warning", f"完成 {done} 個檔案，{failed} 個轉換失敗", duration=6000)
+            msg = tr("完成 {n} 個檔案", n=done) + tr("，{n} 個轉換失敗", n=failed)
+            self.toasts.show("warning", msg, duration=6000)
         elif failed:
-            self.toasts.show("error", "轉換失敗，請查看檔案佇列中的錯誤說明" if failed == 1 else f"{failed} 個檔案轉換失敗", duration=6000)
+            msg = tr("轉換失敗，請查看檔案佇列中的錯誤說明") if failed == 1 else tr("{n} 個檔案轉換失敗", n=failed)
+            self.toasts.show("error", msg, duration=6000)
         elif done == 1 and last is not None:
-            self.toasts.show("success", f"已儲存 {last.name}", "開啟檔案", lambda p=last: self._open_path(p), duration=6000)
+            self.toasts.show("success", tr("已儲存 {name}", name=last.name), tr("開啟檔案"),
+                             lambda p=last: self._open_path(p), duration=6000)
         elif done and last is not None:
-            msg = f"已完成 {done} 個檔案的轉換" + (f"（{cancelled} 個已取消）" if cancelled else "")
-            self.toasts.show("success", msg, "開啟資料夾", lambda p=last: reveal_in_explorer(p), duration=6000)
+            msg = tr("已完成 {n} 個檔案的轉換", n=done) + (tr("（{n} 個已取消）", n=cancelled) if cancelled else "")
+            self.toasts.show("success", msg, tr("開啟資料夾"), lambda p=last: reveal_in_explorer(p), duration=6000)
 
     # ------------------------------------------------------------------ actions
     def _open_path(self, path: Path) -> None:
         if not path.exists():
-            self.toasts.show("error", "找不到檔案，可能已被移動或刪除")
+            self.toasts.show("error", tr("找不到檔案，可能已被移動或刪除"))
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
@@ -614,8 +678,8 @@ class MainWindow(QMainWindow):
             return
         result = job.result
         if action == "copy" and result:
-            QApplication.clipboard().setText(result.markdown)
-            self.toasts.show("success", "已複製 Markdown 到剪貼簿", duration=2000)
+            QApplication.clipboard().setText(result.load_markdown())
+            self.toasts.show("success", tr("已複製 Markdown 到剪貼簿"), duration=2000)
         elif action == "open" and result:
             self._open_path(result.output_path)
         elif action == "reveal":
@@ -635,22 +699,23 @@ class MainWindow(QMainWindow):
 
     def _save_as(self, result: ConvertResult) -> None:
         start = str(Path(self.store.value("last_save_dir", str(result.output_path.parent))) / result.output_path.name)
-        target, _ = QFileDialog.getSaveFileName(self, "另存 Markdown", start, "Markdown (*.md);;所有檔案 (*)")
+        target, _ = QFileDialog.getSaveFileName(self, tr("另存 Markdown"), start, f"Markdown (*.md);;{tr('所有檔案')} (*)")
         if not target:
             return
         target_path = Path(target)
         if target_path.suffix.lower() not in (".md", ".markdown"):
             target_path = target_path.with_suffix(".md")
         try:
-            target_path.write_text(result.markdown, encoding="utf-8", newline="\n")
+            target_path.write_text(result.load_markdown(), encoding="utf-8", newline="\n")
             images = images_dir_for(result.output_path)
             if images.is_dir() and target_path.parent.resolve() != result.output_path.parent.resolve():
                 shutil.copytree(images, target_path.parent / images.name, dirs_exist_ok=True)
         except OSError as exc:
-            self.toasts.show("error", f"儲存失敗：{exc}")
+            self.toasts.show("error", tr("儲存失敗：{error}", error=exc))
             return
         self.store.setValue("last_save_dir", str(target_path.parent))
-        self.toasts.show("success", f"已另存為 {target_path.name}", "顯示", lambda: reveal_in_explorer(target_path))
+        self.toasts.show("success", tr("已另存為 {name}", name=target_path.name), tr("顯示"),
+                         lambda: reveal_in_explorer(target_path))
 
     def _on_context_menu(self, job_id: int, global_pos) -> None:
         job = self.model.get(job_id)
@@ -660,7 +725,7 @@ class MainWindow(QMainWindow):
         done = job.status == Status.DONE and job.result is not None
 
         def add(text, icon_name, action, enabled=True):
-            act = menu.addAction(icons.themed(icon_name), text)
+            act = menu.addAction(icons.themed(icon_name), tr(text))
             act.setEnabled(enabled)
             act.triggered.connect(lambda: self._on_preview_action(action, job_id))
 
@@ -743,15 +808,20 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ shutdown
     def closeEvent(self, e):
         if self.queue.running:
-            box = QMessageBox(QMessageBox.Icon.Question, "轉換進行中", f"仍有檔案正在轉換，確定要結束 {APP_NAME} 嗎？", parent=self)
-            leave = box.addButton("停止並結束", QMessageBox.ButtonRole.DestructiveRole)
-            box.addButton("繼續轉換", QMessageBox.ButtonRole.RejectRole)
+            box = QMessageBox(QMessageBox.Icon.Question, tr("轉換進行中"),
+                              tr("仍有檔案正在轉換，確定要結束 {app} 嗎？", app=APP_NAME), parent=self)
+            leave = box.addButton(tr("停止並重新啟動") if self._restart else tr("停止並結束"),
+                                  QMessageBox.ButtonRole.DestructiveRole)
+            box.addButton(tr("繼續轉換"), QMessageBox.ButtonRole.RejectRole)
             box.exec()
             if box.clickedButton() is not leave:
+                self._restart = False
                 e.ignore()
                 return
         self._save_all()
         self.hide()
+        if self._restart:
+            relaunch()  # settings are saved; the new window can appear while this one finishes shutting down
         clean = self.queue.shutdown(6000)
         self.renderer.shutdown()
         e.accept()

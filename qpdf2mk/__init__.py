@@ -9,7 +9,7 @@ It is distributed WITHOUT ANY WARRANTY; see the LICENSE file for details.
 
 APP_NAME = "qPdf2MD"
 APP_TAGLINE = "PDF → Markdown 轉換器"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 PUBLISHER = "SAISAI.Dev"  # shown in the About box, file properties and the Store (PublisherDisplayName)
 ORG_NAME = "SAISAI"  # folder / registry name for settings and logs; keep it so existing settings carry over
 COPYRIGHT = f"© 2026 {PUBLISHER}"

@@ -16,6 +16,7 @@ from PySide6.QtGui import QColor, QConicalGradient, QFont, QFontMetrics, QLinear
 from PySide6.QtWidgets import QAbstractButton, QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
 from .. import icons, theme
+from ..i18n import tr
 
 
 def blend(a: QColor, b: QColor, t: float) -> QColor:
@@ -115,6 +116,7 @@ class ToggleRow(QWidget):
         col = QVBoxLayout()
         col.setSpacing(2)
         self.title = QLabel(title, objectName="FieldLabel")
+        self.title.setWordWrap(True)  # longer translations must not widen the settings form
         col.addWidget(self.title)
         self.hint = QLabel(hint, objectName="Hint")
         self.hint.setWordWrap(True)
@@ -286,7 +288,7 @@ class SegmentedControl(QWidget):
 # --------------------------------------------------------------------------- stepper
 
 class Stepper(QWidget):
-    STEPS = ("加入檔案", "調整設定", "轉換", "檢視成果")
+    STEPS = ("加入檔案", "調整設定", "轉換", "檢視成果")  # message keys
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -302,7 +304,7 @@ class Stepper(QWidget):
 
     def _metrics(self):
         fm = QFontMetrics(self.font())
-        widths = [24 + 8 + fm.horizontalAdvance(s) for s in self.STEPS]
+        widths = [24 + 8 + fm.horizontalAdvance(tr(s)) for s in self.STEPS]
         gap = 36
         return widths, gap, sum(widths) + gap * (len(widths) - 1)
 
@@ -317,7 +319,7 @@ class Stepper(QWidget):
         x = (self.width() - total) / 2
         cy = self.height() / 2
         num_font = theme.ui_font(8.5, QFont.Weight.Bold)
-        for i, label in enumerate(self.STEPS):
+        for i, label in enumerate(tr(s) for s in self.STEPS):
             circle = QRectF(x, cy - 12, 24, 24)
             if i < self._step:
                 painter.setPen(Qt.PenStyle.NoPen)
@@ -483,7 +485,7 @@ class StatusPill(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._role = "warning"
-        self._text = "引擎載入中"
+        self._text = tr("引擎載入中")
         self._pulse = 0.0
         self._timer = QTimer(self)
         self._timer.setInterval(40)
